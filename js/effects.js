@@ -174,21 +174,25 @@ class EffectSystem {
    */
   addFireCone(x, y, angle, color, range) {
     var baseColor = color || '#FF5722';
-    for (var i = 0; i < 34; i++) {
-      var spread = angle + (Math.random() - 0.5) * Math.PI * 0.8;
-      var speed = 130 + Math.random() * 210;
-      var offset = Math.random() * 16;
+    // Greatly increase particle count for a massive flame effect
+    for (var i = 0; i < 75; i++) {
+      var spread = angle + (Math.random() - 0.5) * Math.PI * 0.9;
+      // Faster and farther reaching particles
+      var speed = 180 + Math.random() * 300;
+      var offset = Math.random() * 25;
+      
       this.particles.push({
         x: x + Math.cos(spread) * offset,
         y: y + Math.sin(spread) * offset,
         vx: Math.cos(spread) * speed,
         vy: Math.sin(spread) * speed,
-        life: 0.25 + Math.random() * 0.25,
-        maxLife: 0.5,
-        color: i % 3 === 0 ? '#FFD54F' : (i % 3 === 1 ? baseColor : '#D84315'),
-        size: 3 + Math.random() * 5,
-        gravity: -15,
-        friction: 0.92,
+        life: 0.35 + Math.random() * 0.4,
+        maxLife: 0.75,
+        // Brighter center, redder edges
+        color: i % 4 === 0 ? '#FFFFFF' : (i % 4 === 1 ? '#FFD54F' : (i % 4 === 2 ? baseColor : '#D84315')),
+        size: 5 + Math.random() * 10, // Larger sparks
+        gravity: -5, // Less gravity so they fly straighter
+        friction: 0.95,
         type: 'spark'
       });
     }

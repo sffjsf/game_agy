@@ -253,7 +253,7 @@ class Fighter {
     this.hitFlashTimer = Math.max(0, this.hitFlashTimer - dt);
     this.blinkCooldown = Math.max(0, this.blinkCooldown - dt);
     this.cloneTimer = Math.max(0, this.cloneTimer - dt);
-    this.skillReady = (this.skillCooldown <= 0);
+    this.skillReady = (this.skillCooldown <= 0) && (this.poisonTimer <= 0);
 
     this.updatePassiveTimers(dt);
     this.updateAutomaticPassives(opposingTeam, effectSystem);
@@ -314,6 +314,23 @@ class Fighter {
         var dy = this.target.y - this.y;
         var dist = Math.sqrt(dx * dx + dy * dy);
 
+        // Check skill first (every frame while chasing, if ready and target in range)
+        if (this.skillReady && dist <= this.charData.skill.range) {
+          var skillChance = this.getSkillChance();
+          if (Math.random() < skillChance) {
+            this.setState('skill');
+            break;
+          }
+        }
+
+        if (dist <= this.charData.attackRange && this.attackTimer <= 0) {
+          // Normal attack (blocked if skill is ready and in range, ensuring absolute skill priority)
+          if (!(this.skillReady && dist <= this.charData.skill.range)) {
+            this.setState('charge');
+            break;
+          }
+        }
+
         // If melee unit is close but attack is on cooldown, perform repositioning movement (circle/retreat)
         if (this.charData.weaponType === 'melee' && dist <= this.charData.attackRange * 1.5 && this.attackTimer > 0) {
           if (this.repositionType === 'waypoint') {
@@ -327,11 +344,6 @@ class Fighter {
 
         // Apply AI behavior modifications
         this.updateAI(dt, arenaWidth, arenaHeight);
-
-        if (dist <= this.charData.attackRange && this.attackTimer <= 0) {
-          // Normal attack
-          this.setState('charge');
-        }
         break;
 
       // ───────────────────────────────────────────────
@@ -1113,19 +1125,17 @@ class Fighter {
    * @param {EffectSystem} effectSystem
    */
   updatePoison(dt, effectSystem) {
-    if (this.poisonTimer <= 0 || this.poisonDps <= 0 || !this.alive) return;
+    if (this.poisonTimer <= 0 || !this.alive) return;
 
     this.poisonTimer = Math.max(0, this.poisonTimer - dt);
     this.poisonTickTimer -= dt;
     if (this.poisonTickTimer <= 0) {
       this.poisonTickTimer = 0.5;
-      this.takeDamage(this.poisonDps * 0.5, this.x, this.y, effectSystem);
-      effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 12, '中毒', false, '#76FF03');
-      effectSystem.addSkillEffect('poison_cloud', this.x, this.y, '#66BB6A', 28);
+      effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 12, '中毒!', false, '#9C27B0');
+      effectSystem.addSkillEffect('poison_cloud', this.x, this.y, '#9C27B0', 28);
     }
 
     if (this.poisonTimer <= 0) {
-      this.poisonDps = 0;
       this.poisonTickTimer = 0;
     }
   }
@@ -1494,7 +1504,7 @@ class Fighter {
     if (!this.target || !this.target.isAlive()) return;
 
     var skill = this.charData.skill;
-    this.startSkillCast(effectSystem, skill);
+    this.startSkillCast(effectSystem, skill, skill.nameCN || skill.name);
 
     var dx = this.target.x - this.x;
     var dy = this.target.y - this.y;

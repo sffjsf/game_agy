@@ -1143,7 +1143,7 @@ const CHARACTERS = {
     secondaryColor: '#1B5E20',
     glowColor: 'rgba(102, 187, 106, 0.35)',
     size: 34,
-    speed: 4.0,
+    speed: 3.0,
     hp: 100,
     attackPower: 10,
     attackSpeed: 1.0,
@@ -1156,11 +1156,11 @@ const CHARACTERS = {
     weaponType: 'ranged',
     projectileType: 'poison',
     passives: [
-      { id: 'poison_trail', name: '毒雾足迹', description: '移动时在身后留下数秒毒雾，使敌人中毒。' }
+      { id: 'poison_trail', name: '毒雾足迹', description: '移动时在身后留下毒雾，使敌人中毒沉默0.5秒。' }
     ],
     specialEffects: [
-      { name: '毒弹', description: '普通攻击命中后使敌人中毒并短暂减速。' },
-      { name: '持续毒雾', description: '毒雾区域会持续让敌人中毒。' }
+      { name: '毒弹', description: '普通攻击命中后使敌人中毒沉默0.5秒。' },
+      { name: '持续毒雾', description: '毒雾区域会持续让敌人中毒并沉默技能。' }
     ],
     skill: {
       name: '毒雾瓶',
@@ -1171,7 +1171,7 @@ const CHARACTERS = {
       type: 'poison_cloud',
       duration: 3.0,
       area: 110,
-      poisonDps: 4.0
+      poisonDps: 0
     },
     drawDecorations: function(ctx, x, y, angle, size, time) {
       ctx.save();
