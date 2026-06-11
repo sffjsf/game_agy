@@ -269,6 +269,7 @@ class Fighter {
           // Whistle golden shockwave and TOOT! text
           effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#FFD700', 100);
           effectSystem.screenShake(6);
+          this.showSkillName(effectSystem, '蒸汽鸣笛');
           effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '鸣笛 TOOT!', false, '#FFD700');
         }
       }
@@ -297,6 +298,14 @@ class Fighter {
     }
     if (typeof this.angle !== 'number' || !isFinite(this.angle)) {
       this.angle = this.team === 'left' ? 0 : Math.PI;
+    }
+
+    // Skills have absolute priority: cast immediately once ready and in range.
+    if (this.canCastSkillNow()) {
+      this.setState('skill');
+    } else if (this.skillReady && this.target && this.target.isAlive() &&
+        this.state !== 'skill' && this.state !== 'dashing_skill' && this.state !== 'dead') {
+      this.setState('chase');
     }
 
     // ── State machine ──
@@ -335,15 +344,6 @@ class Fighter {
 
         // Apply AI behavior modifications
         this.updateAI(dt, arenaWidth, arenaHeight);
-
-        // Check skill first (every frame while chasing, if ready and target in range)
-        if (this.skillReady && dist <= this.charData.skill.range) {
-          var skillChance = this.getSkillChance();
-          if (Math.random() < skillChance) {
-            this.setState('skill');
-            break;
-          }
-        }
 
         if (dist <= this.charData.attackRange && this.attackTimer <= 0) {
           // Normal attack
@@ -412,8 +412,6 @@ class Fighter {
         if (!this.attackExecuted) {
           this.attackExecuted = true;
           this.executeSkill(weaponSystem, effectSystem);
-          this.skillCooldown = this.charData.skill.cooldown;
-          this.skillReady = false;
         }
         // Skill animation time
         if (this.stateTimer >= 0.5) {
@@ -975,17 +973,45 @@ class Fighter {
   }
 
   /**
-   * Get skill activation chance per frame based on AI tendency.
-   * @returns {number} Probability (0-1)
+   * Whether the fighter should immediately spend its ready skill.
+   * @returns {boolean}
    */
-  getSkillChance() {
-    switch (this.charData.aiTendency) {
-      case 'aggressive': return 0.05;  // 5% per frame — use ASAP
-      case 'cautious':   return 0.02;  // 2% per frame
-      case 'balanced':
-        return this.hp > this.maxHp * 0.5 ? 0.03 : 0.02;
-      default:           return 0.02;
-    }
+  canCastSkillNow() {
+    if (!this.skillReady || !this.charData.skill) return false;
+    if (!this.target || !this.target.isAlive()) return false;
+    if (this.state === 'skill' || this.state === 'dashing_skill' || this.state === 'dead') return false;
+
+    var dx = this.target.x - this.x;
+    var dy = this.target.y - this.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    return isFinite(dist) && dist <= this.charData.skill.range;
+  }
+
+  /**
+   * Shared beginning-of-skill behavior. Keep cross-skill visuals,
+   * audio, and cooldowns here so individual payloads cannot skip them.
+   * @param {EffectSystem} effectSystem
+   * @param {object} skill
+   * @param {string=} displayName
+   */
+  startSkillCast(effectSystem, skill, displayName) {
+    if (!skill) return;
+
+    this.skillCooldown = skill.cooldown || 0;
+    this.skillReady = false;
+
+    if (window.soundSystem) window.soundSystem.playSkillSound();
+    this.showSkillName(effectSystem, displayName || skill.name);
+  }
+
+  /**
+   * Show a team-colored skill name above this fighter.
+   * @param {EffectSystem} effectSystem
+   * @param {string} skillName
+   */
+  showSkillName(effectSystem, skillName) {
+    if (!effectSystem || !skillName) return;
+    effectSystem.addSkillName(this.x, this.y - this.charData.size - 34, skillName, this.team);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1190,11 +1216,11 @@ class Fighter {
    * @param {EffectSystem} effectSystem
    */
   executeSkill(weaponSystem, effectSystem) {
-    if (window.soundSystem) window.soundSystem.playSkillSound();
-
     if (!this.target || !this.target.isAlive()) return;
 
     var skill = this.charData.skill;
+    this.startSkillCast(effectSystem, skill);
+
     var dx = this.target.x - this.x;
     var dy = this.target.y - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy);

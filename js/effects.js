@@ -134,6 +134,36 @@ class EffectSystem {
     });
   }
 
+  /**
+   * Add a bold, large floating skill name above the caster.
+   * @param {number} x - Position X
+   * @param {number} y - Position Y
+   * @param {string} skillName - Skill name to display
+   * @param {string} team - Caster team, 'left' or 'right'
+   */
+  addSkillName(x, y, skillName, team) {
+    var text = typeof skillName === 'string' && skillName ? skillName : '技能释放';
+    var isLeft = team === 'left';
+    var displayX = isFinite(x) ? x : 400;
+    var displayY = isFinite(y) ? y : 260;
+
+    this.damageNumbers.push({
+      x: displayX,
+      y: displayY,
+      vy: -95,
+      text: text,
+      life: 1.15,
+      maxLife: 1.15,
+      color: isLeft ? '#00E5FF' : '#FF3D00',
+      strokeColor: isLeft ? '#063B62' : '#5A1600',
+      glowColor: isLeft ? 'rgba(0, 229, 255, 0.85)' : 'rgba(255, 61, 0, 0.85)',
+      fontSize: 40,
+      isCrit: false,
+      isSkillName: true,
+      team: team
+    });
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // CHARGE EFFECT - Particles converging inward (charging up)
   // ═══════════════════════════════════════════════════════════════
@@ -567,7 +597,18 @@ class EffectSystem {
       ctx.shadowOffsetY = 1;
 
       // Crit numbers scale up slightly
-      if (d.isCrit) {
+      if (d.isSkillName) {
+        var skillScale = 0.82 + Math.sin((1 - alpha) * Math.PI) * 0.3 + alpha * 0.18;
+        ctx.translate(d.x, d.y);
+        ctx.scale(skillScale, skillScale);
+        ctx.shadowColor = d.glowColor || d.color;
+        ctx.shadowBlur = 14;
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = d.strokeColor || '#111111';
+        ctx.fillStyle = d.color;
+        ctx.strokeText(d.text, 0, 0);
+        ctx.fillText(d.text, 0, 0);
+      } else if (d.isCrit) {
         var scale = 1 + (1 - alpha) * 0.3;
         ctx.translate(d.x, d.y);
         ctx.scale(scale, scale);
