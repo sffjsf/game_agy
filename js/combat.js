@@ -40,17 +40,38 @@ class CombatManager {
 
   /* ── Battle lifecycle ─────────────────────────────────── */
 
-  startBattle(char1Id, char2Id) {
+  startBattle(leftIds, rightIds) {
     this._computeArena();
 
-    // Create fighters
-    const spawnY = this.arenaY + this.arenaHeight / 2;
-    this.fighter1 = new Fighter(char1Id, this.arenaX + 80, spawnY, 'left');
-    this.fighter2 = new Fighter(char2Id, this.arenaX + this.arenaWidth - 80, spawnY, 'right');
+    // Support single string backwards compatibility
+    if (typeof leftIds === 'string') leftIds = [leftIds];
+    if (typeof rightIds === 'string') rightIds = [rightIds];
 
-    // Assign targets
-    this.fighter1.setTarget(this.fighter2);
-    this.fighter2.setTarget(this.fighter1);
+    this.fightersLeft = [];
+    this.fightersRight = [];
+
+    const spawnXLeft = this.arenaX + 80;
+    const spawnXRight = this.arenaX + this.arenaWidth - 80;
+    const centerY = this.arenaY + this.arenaHeight / 2;
+    const spacing = 70; // Vertical spacing
+
+    // Spawn Left Team
+    const numLeft = leftIds.length;
+    const startYLeft = centerY - ((numLeft - 1) * spacing) / 2;
+    for (let i = 0; i < numLeft; i++) {
+      const y = startYLeft + i * spacing;
+      const f = new Fighter(leftIds[i], spawnXLeft, y, 'left');
+      this.fightersLeft.push(f);
+    }
+
+    // Spawn Right Team
+    const numRight = rightIds.length;
+    const startYRight = centerY - ((numRight - 1) * spacing) / 2;
+    for (let i = 0; i < numRight; i++) {
+      const y = startYRight + i * spacing;
+      const f = new Fighter(rightIds[i], spawnXRight, y, 'right');
+      this.fightersRight.push(f);
+    }
 
     // Reset systems
     this.weaponSystem.clear();
@@ -76,15 +97,20 @@ class CombatManager {
     }
 
     if (this.state === 'fighting') {
-      // Update fighters
-      this.fighter1.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY);
-      this.fighter2.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY);
+      // Update left and right fighters
+      this.fightersLeft.forEach(f => {
+        f.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY, this.fightersRight);
+      });
+      this.fightersRight.forEach(f => {
+        f.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY, this.fightersLeft);
+      });
 
-      // Resolve collision between fighters to prevent overlapping
+      // Resolve collision between all active fighters
       this.resolveFighterCollision();
 
       // Update projectiles / melee hits
-      const hits = this.weaponSystem.update(dt, [this.fighter1, this.fighter2]);
+      const allFighters = [...this.fightersLeft, ...this.fightersRight];
+      const hits = this.weaponSystem.update(dt, allFighters);
 
       // Process hits
       if (hits && hits.length > 0) {
@@ -92,12 +118,30 @@ class CombatManager {
           if (hit.target && hit.target.isAlive()) {
             hit.target.takeDamage(hit.damage, hit.projectile ? hit.projectile.x : hit.target.x, hit.projectile ? hit.projectile.y : hit.target.y, this.effectSystem);
 
+            // Handle special train projectile stun
+            if (hit.projectile && hit.projectile.type === 'train') {
+              hit.target.applyStun(1.8);
+              this.effectSystem.addSkillEffect('stun', hit.target.x, hit.target.y, '#FFD700', 30);
+            }
+
+            // Handle special bat projectile lifesteal (100% siphon)
+            if (hit.projectile && hit.projectile.type === 'bat') {
+              const attacker = hit.projectile.attacker;
+              if (attacker && attacker.isAlive()) {
+                attacker.heal(hit.damage * 1.0, this.effectSystem);
+              }
+            }
+
             // Lifesteal – heal attacker
-            const attacker = hit.target === this.fighter1 ? this.fighter2 : this.fighter1;
-            if (attacker.charData.lifesteal && attacker.charData.lifesteal > 0) {
-              const healAmt = hit.damage * attacker.charData.lifesteal;
-              if (healAmt > 0) {
-                attacker.heal(healAmt, this.effectSystem);
+            const attacker = hit.projectile ? hit.projectile.attacker : null;
+            if (attacker && attacker.isAlive() && attacker.charData.lifesteal && attacker.charData.lifesteal > 0) {
+              if (hit.projectile && hit.projectile.type === 'bat') {
+                // Already siphoned 100%
+              } else {
+                const healAmt = hit.damage * attacker.charData.lifesteal;
+                if (healAmt > 0) {
+                  attacker.heal(healAmt, this.effectSystem);
+                }
               }
             }
           }
@@ -108,27 +152,21 @@ class CombatManager {
       this.effectSystem.update(dt);
 
       // Check death
-      if (!this.fighter1.isAlive() || !this.fighter2.isAlive()) {
+      const leftAlive = this.fightersLeft.some(f => f.isAlive());
+      const rightAlive = this.fightersRight.some(f => f.isAlive());
+
+      if (!leftAlive || !rightAlive) {
         this.state = 'finished';
-        if (!this.fighter1.isAlive() && !this.fighter2.isAlive()) {
+        if (!leftAlive && !rightAlive) {
           this.winner = null; // draw
         } else {
-          this.winner = this.fighter1.isAlive() ? this.fighter1 : this.fighter2;
+          this.winner = leftAlive ? 'left' : 'right';
         }
       }
 
       this.battleTime += dt;
 
-      // Safety timeout – 60 second hard limit
-      if (this.battleTime > 60) {
-        this.state = 'finished';
-        // Higher HP wins, else draw
-        if (this.fighter1.hp !== this.fighter2.hp) {
-          this.winner = this.fighter1.hp > this.fighter2.hp ? this.fighter1 : this.fighter2;
-        } else {
-          this.winner = null;
-        }
-      }
+      // No battle time limit; battles go on until one side is defeated
       return;
     }
 
@@ -138,33 +176,43 @@ class CombatManager {
     }
   }
 
-  /**
-   * Resolve collisions between the two fighters to prevent them from completely overlapping.
-   * Allows them to get close (up to 70% of combined size) but pushes them apart if they overlap more.
-   */
   resolveFighterCollision() {
-    if (!this.fighter1 || !this.fighter2) return;
-    if (!this.fighter1.isAlive() || !this.fighter2.isAlive()) return;
+    const allFighters = [...this.fightersLeft, ...this.fightersRight].filter(f => f.isAlive());
+    if (allFighters.length < 2) return;
 
-    const dx = this.fighter2.x - this.fighter1.x;
-    const dy = this.fighter2.y - this.fighter1.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    // Combined radius * 0.7 to allow close-combat but prevent overlapping
-    const minDist = (this.fighter1.charData.size + this.fighter2.charData.size) * 0.7;
+    for (let i = 0; i < allFighters.length; i++) {
+      for (let j = i + 1; j < allFighters.length; j++) {
+        const f1 = allFighters[i];
+        const f2 = allFighters[j];
 
-    if (dist < minDist) {
-      const overlap = minDist - dist;
-      // Normal vector pointing from fighter1 to fighter2
-      const nx = dx / (dist || 1);
-      const ny = dy / (dist || 1);
+        const dx = f2.x - f1.x;
+        const dy = f2.y - f1.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Combined radius * 0.75 to allow close combat but prevent overlapping
+        const minDist = (f1.charData.size + f2.charData.size) * 0.75;
 
-      // Push them apart by half the overlap each
-      const pushDist = overlap / 2;
-      this.fighter1.x -= nx * pushDist;
-      this.fighter1.y -= ny * pushDist;
-      this.fighter2.x += nx * pushDist;
-      this.fighter2.y += ny * pushDist;
+        if (isFinite(dist) && dist < minDist) {
+          const overlap = minDist - dist;
+          const nx = dx / (dist || 1);
+          const ny = dy / (dist || 1);
+
+          // Push them apart by half the overlap each
+          const pushDist = overlap / 2;
+          
+          if (isFinite(pushDist) && isFinite(nx) && isFinite(ny)) {
+            const nextF1X = f1.x - nx * pushDist;
+            const nextF1Y = f1.y - ny * pushDist;
+            const nextF2X = f2.x + nx * pushDist;
+            const nextF2Y = f2.y + ny * pushDist;
+
+            if (isFinite(nextF1X)) f1.x = nextF1X;
+            if (isFinite(nextF1Y)) f1.y = nextF1Y;
+            if (isFinite(nextF2X)) f2.x = nextF2X;
+            if (isFinite(nextF2Y)) f2.y = nextF2Y;
+          }
+        }
+      }
     }
   }
 
@@ -194,8 +242,9 @@ class CombatManager {
 
     // ── Battle / Finished rendering ──
     if (this.state === 'fighting' || this.state === 'finished') {
-      this.fighter1.render(ctx, performance.now() / 1000);
-      this.fighter2.render(ctx, performance.now() / 1000);
+      const time = performance.now() / 1000;
+      this.fightersLeft.forEach(f => f.render(ctx, time));
+      this.fightersRight.forEach(f => f.render(ctx, time));
       this.weaponSystem.render(ctx);
       this.effectSystem.render(ctx);
     }

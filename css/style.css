@@ -69,6 +69,12 @@ html, body {
   justify-content: flex-start;
 }
 
+#select-screen {
+  overflow-y: auto;
+  justify-content: flex-start;
+  padding: 40px 20px;
+}
+
 /* ═══════════════════════════════════════════════════════════
    GAME TITLE
    ═══════════════════════════════════════════════════════════ */
@@ -163,14 +169,37 @@ html, body {
 }
 
 .character-card.selected::after {
-  content: '✓';
+  content: attr(data-select-index);
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #0d0d0d;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 900;
+  box-shadow: 0 0 10px var(--accent);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.hero-badge {
   position: absolute;
   top: 6px;
-  right: 8px;
-  font-size: 14px;
-  color: var(--accent);
-  font-weight: 900;
-  text-shadow: 0 0 6px var(--accent);
+  left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #FFD700;
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid #FFD700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-shadow: 0 0 4px rgba(255, 215, 0, 0.6);
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.2);
+  user-select: none;
 }
 
 /* Card: preview circle */
@@ -610,4 +639,165 @@ html, body {
   #countdown-text.fight-text {
     font-size: 52px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Codex Screen
+   ═══════════════════════════════════════════════════════ */
+#codex-screen {
+  background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a1a 100%);
+  overflow-y: auto;
+  justify-content: flex-start;
+  padding: 40px 20px;
+}
+
+.codex-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.codex-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 20px;
+}
+
+.codex-header h1 {
+  font-size: 2.5rem;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(0, 229, 255, 0.6);
+  margin: 0;
+}
+
+.codex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 30px;
+}
+
+.codex-card {
+  background: rgba(30, 30, 40, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 24px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.codex-card:hover {
+  transform: translateY(-5px) scale(1.02);
+}
+
+.codex-card-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 15px;
+}
+
+.codex-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  box-shadow: 0 0 15px rgba(0,0,0,0.5);
+}
+
+.codex-title {
+  flex: 1;
+}
+
+.codex-title h2 {
+  font-size: 1.4rem;
+  margin: 0 0 5px 0;
+  color: #fff;
+}
+
+.codex-title p {
+  font-size: 0.9rem;
+  color: #aaa;
+  margin: 0;
+  font-style: italic;
+}
+
+.codex-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  font-size: 0.95rem;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  background: rgba(0,0,0,0.3);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.stat-value {
+  color: #00E5FF;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.stat-value.damage { color: #FF3D00; }
+.stat-value.hp { color: #4CAF50; }
+.stat-value.speed { color: #FFC107; }
+
+.codex-skill {
+  background: rgba(126, 87, 194, 0.15);
+  border: 1px solid rgba(126, 87, 194, 0.3);
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: auto;
+}
+
+.skill-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.skill-name {
+  color: #B39DDB;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.skill-cd {
+  font-size: 0.8rem;
+  color: #aaa;
+  background: rgba(0,0,0,0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.skill-desc {
+  font-size: 0.85rem;
+  color: #ddd;
+  line-height: 1.4;
+  margin: 0;
 }

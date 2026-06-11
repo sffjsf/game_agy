@@ -5,6 +5,7 @@
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('battle-canvas');
   const combatManager = new CombatManager(canvas);
+  window.combatManager = combatManager; // Expose globally for AI targeting & skills
   const uiManager = new UIManager();
 
   /* ── Canvas sizing ────────────────────────────────────── */
@@ -26,13 +27,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
   /* ── Event handlers ───────────────────────────────────── */
 
-  uiManager.onStartBattle((leftId, rightId) => {
+  uiManager.onStartBattle((leftIds, rightIds) => {
     uiManager.showScreen('battle');
     uiManager.hideCountdown();
     // Ensure canvas dimensions are up to date after screen switch
     requestAnimationFrame(() => {
       resizeCanvas();
-      combatManager.startBattle(leftId, rightId);
+      combatManager.startBattle(leftIds, rightIds);
     });
   });
 
@@ -89,13 +90,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // ── HUD update ──
     if (state === 'fighting') {
-      uiManager.updateHUD(combatManager.getFighter1(), combatManager.getFighter2());
+      uiManager.updateHUD(combatManager.fightersLeft, combatManager.fightersRight);
     }
 
     // ── Finished ──
     if (state === 'finished' && !resultShown) {
       combatManager.update(dt); // continue rendering remaining effects
-      uiManager.updateHUD(combatManager.getFighter1(), combatManager.getFighter2());
+      uiManager.updateHUD(combatManager.fightersLeft, combatManager.fightersRight);
       setTimeout(() => {
         uiManager.showResult(combatManager.getWinner(), combatManager.getBattleTime());
       }, 1500);

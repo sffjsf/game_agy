@@ -27,7 +27,10 @@
         <div class="character-grid" id="right-grid"></div>
       </div>
     </div>
-    <button id="start-btn" class="btn-primary" disabled>选择角色开始战斗</button>
+    <div style="display: flex; gap: 20px; justify-content: center; margin-top: 20px;">
+      <button id="start-btn" class="btn-primary" disabled>选择角色开始战斗</button>
+      <button id="open-codex-btn" class="btn-secondary">📖 英雄图鉴</button>
+    </div>
   </div>
 
   <!-- ═══════════ Battle Screen ═══════════ -->
@@ -70,13 +73,25 @@
     </div>
   </div>
 
+  <!-- ═══════════ Codex Screen ═══════════ -->
+  <div id="codex-screen" class="screen" style="display:none">
+    <div class="codex-container">
+      <div class="codex-header">
+        <h1>英雄图鉴 (Hero Codex)</h1>
+        <button id="close-codex-btn" class="btn-secondary">返回主页 (Back)</button>
+      </div>
+      <div id="codex-grid" class="codex-grid"></div>
+    </div>
+  </div>
+
   <!-- ═══════════ Scripts (dependency order) ═══════════ -->
-  <script src="js/characters.js"></script>
-  <script src="js/effects.js"></script>
-  <script src="js/weapon.js"></script>
-  <script src="js/fighter.js"></script>
-  <script src="js/combat.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/characters.js?v=1781182099"></script>
+  <script src="js/effects.js?v=1781182099"></script>
+  <script src="js/weapon.js?v=1781182099"></script>
+  <script src="js/fighter.js?v=1781182099"></script>
+  <script src="js/combat.js?v=1781182099"></script>
+  <script src="js/ui.js?v=1781182099"></script>
+  <script src="js/main.js?v=1781182099"></script>
 </body>
 </html>

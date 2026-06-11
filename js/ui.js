@@ -8,6 +8,7 @@ class UIManager {
     this.selectScreen = document.getElementById('select-screen');
     this.battleScreen = document.getElementById('battle-screen');
     this.resultScreen = document.getElementById('result-screen');
+    this.codexScreen = document.getElementById('codex-screen');
 
     // ── Select screen ──
     this.leftGrid = document.getElementById('left-grid');
@@ -57,13 +58,16 @@ class UIManager {
 
     charIds.forEach(id => {
       const char = CHARACTERS[id];
+      if (char.hidden) return; // Hide summoned minions from selection
       this.leftGrid.appendChild(this._createCard(id, char, 'left'));
       this.rightGrid.appendChild(this._createCard(id, char, 'right'));
     });
 
-    // Reset selections
-    this.selectedLeft = null;
-    this.selectedRight = null;
+    // Reset selections as arrays
+    this.selectedLeft = [];
+    this.selectedRight = [];
+    this._updateGridVisuals('left');
+    this._updateGridVisuals('right');
     this._updateStartButton();
   }
 
@@ -97,6 +101,15 @@ class UIManager {
     card.appendChild(name);
     card.appendChild(stats);
 
+    // Hero badge for superheroes
+    const isHero = (charId === 'one_punch_man' || charId === 'blood_demon' || charId === 'train_conductor');
+    if (isHero) {
+      const badge = document.createElement('div');
+      badge.className = 'hero-badge';
+      badge.textContent = '⭐ 英雄';
+      card.appendChild(badge);
+    }
+
     // Click handler
     card.addEventListener('click', () => this._selectCard(charId, side));
 
@@ -117,40 +130,52 @@ class UIManager {
     return card;
   }
 
-  _selectCard(charId, side) {
-    const char = CHARACTERS[charId];
-    const gridId = side === 'left' ? 'left-grid' : 'right-grid';
-    const grid = document.getElementById(gridId);
+  _updateGridVisuals(side) {
+    const list = side === 'left' ? this.selectedLeft : this.selectedRight;
+    const grid = side === 'left' ? this.leftGrid : this.rightGrid;
 
-    // Deselect previous
-    grid.querySelectorAll('.character-card').forEach(c => {
-      c.classList.remove('selected');
-      c.style.boxShadow = '';
-      c.style.borderColor = '';
+    grid.querySelectorAll('.character-card').forEach(card => {
+      const charId = card.dataset.charId;
+      const index = list.indexOf(charId);
+      const char = CHARACTERS[charId];
+
+      if (index > -1) {
+        card.classList.add('selected');
+        card.setAttribute('data-select-index', index + 1);
+        card.style.boxShadow = `0 0 24px ${char.color}80, inset 0 0 24px ${char.color}20`;
+        card.style.borderColor = char.color;
+      } else {
+        card.classList.remove('selected');
+        card.removeAttribute('data-select-index');
+        card.style.boxShadow = '';
+        card.style.borderColor = '';
+      }
     });
+  }
 
-    // Select new
-    const card = grid.querySelector(`[data-char-id="${charId}"]`);
-    if (card) {
-      card.classList.add('selected');
-      card.style.boxShadow = `0 0 24px ${char.color}80, inset 0 0 24px ${char.color}20`;
-      card.style.borderColor = char.color;
-    }
+  _selectCard(charId, side) {
+    const list = side === 'left' ? this.selectedLeft : this.selectedRight;
+    const index = list.indexOf(charId);
 
-    if (side === 'left') {
-      this.selectedLeft = charId;
+    if (index > -1) {
+      list.splice(index, 1);
     } else {
-      this.selectedRight = charId;
+      if (list.length < 5) {
+        list.push(charId);
+      } else {
+        alert('每队最多选择 5 个战士！');
+      }
     }
 
+    this._updateGridVisuals(side);
     this._updateStartButton();
   }
 
   _updateStartButton() {
-    const ready = this.selectedLeft !== null && this.selectedRight !== null;
+    const ready = this.selectedLeft.length > 0 && this.selectedRight.length > 0;
     this.startBtn.disabled = !ready;
     if (ready) {
-      this.startBtn.textContent = '⚔️ 开始战斗!';
+      this.startBtn.textContent = `⚔️ 开始战斗! (${this.selectedLeft.length} vs ${this.selectedRight.length})`;
     } else {
       this.startBtn.textContent = '选择角色开始战斗';
     }
@@ -164,6 +189,7 @@ class UIManager {
     this.selectScreen.style.display = 'none';
     this.battleScreen.style.display = 'none';
     this.resultScreen.style.display = 'none';
+    if(this.codexScreen) this.codexScreen.style.display = 'none';
 
     switch (screenName) {
       case 'select':
@@ -174,6 +200,9 @@ class UIManager {
         break;
       case 'result':
         this.resultScreen.style.display = '';
+        break;
+      case 'codex':
+        if(this.codexScreen) this.codexScreen.style.display = 'flex';
         break;
     }
   }
@@ -196,28 +225,63 @@ class UIManager {
      Battle HUD
      ═══════════════════════════════════════════════════════ */
 
-  updateHUD(fighter1, fighter2) {
-    if (!fighter1 || !fighter2) return;
+  updateHUD(teamLeft, teamRight) {
+    if (!teamLeft || !teamRight) return;
 
-    // Names
-    this.leftName.textContent = fighter1.charData.nameCN || fighter1.charData.name;
-    this.leftName.style.color = fighter1.charData.color;
-    this.rightName.textContent = fighter2.charData.nameCN || fighter2.charData.name;
-    this.rightName.style.color = fighter2.charData.color;
+    // Left Names joined
+    this.leftName.innerHTML = '';
+    teamLeft.forEach((f, idx) => {
+      if (idx > 0) {
+        const plus = document.createElement('span');
+        plus.textContent = ' + ';
+        plus.style.color = '#888';
+        this.leftName.appendChild(plus);
+      }
+      const span = document.createElement('span');
+      span.textContent = f.charData.nameCN || f.charData.name;
+      span.style.color = f.charData.color;
+      if (!f.isAlive()) {
+        span.style.textDecoration = 'line-through';
+        span.style.opacity = '0.35';
+      }
+      this.leftName.appendChild(span);
+    });
 
-    // HP bars
-    const hp1Pct = Math.max(0, fighter1.hp / fighter1.maxHp * 100);
-    const hp2Pct = Math.max(0, fighter2.hp / fighter2.maxHp * 100);
+    // Right Names joined
+    this.rightName.innerHTML = '';
+    teamRight.forEach((f, idx) => {
+      if (idx > 0) {
+        const plus = document.createElement('span');
+        plus.textContent = ' + ';
+        plus.style.color = '#888';
+        this.rightName.appendChild(plus);
+      }
+      const span = document.createElement('span');
+      span.textContent = f.charData.nameCN || f.charData.name;
+      span.style.color = f.charData.color;
+      if (!f.isAlive()) {
+        span.style.textDecoration = 'line-through';
+        span.style.opacity = '0.35';
+      }
+      this.rightName.appendChild(span);
+    });
 
-    this.leftHpBar.style.width = hp1Pct + '%';
-    this.rightHpBar.style.width = hp2Pct + '%';
+    // Update HP bars and text dynamically for both teams
+    var leftTotalHp = teamLeft.reduce((sum, f) => sum + (f.isAlive() ? f.hp : 0), 0);
+    if (!isFinite(leftTotalHp)) leftTotalHp = 0;
+    const leftTotalMaxHp = teamLeft.reduce((sum, f) => sum + f.maxHp, 0);
+    const leftPct = leftTotalMaxHp > 0 ? (leftTotalHp / leftTotalMaxHp) * 100 : 0;
+    this.leftHpBar.style.width = (isFinite(leftPct) ? leftPct : 0) + '%';
+    this.leftHpBar.style.background = this._hpGradient(leftPct);
+    this.leftHpText.textContent = Math.ceil(leftTotalHp) + '/' + leftTotalMaxHp;
 
-    this.leftHpBar.style.background = this._hpGradient(hp1Pct);
-    this.rightHpBar.style.background = this._hpGradient(hp2Pct);
-
-    // HP text
-    this.leftHpText.textContent = `${Math.ceil(Math.max(0, fighter1.hp))}/${fighter1.maxHp}`;
-    this.rightHpText.textContent = `${Math.ceil(Math.max(0, fighter2.hp))}/${fighter2.maxHp}`;
+    var rightTotalHp = teamRight.reduce((sum, f) => sum + (f.isAlive() ? f.hp : 0), 0);
+    if (!isFinite(rightTotalHp)) rightTotalHp = 0;
+    const rightTotalMaxHp = teamRight.reduce((sum, f) => sum + f.maxHp, 0);
+    const rightPct = rightTotalMaxHp > 0 ? (rightTotalHp / rightTotalMaxHp) * 100 : 0;
+    this.rightHpBar.style.width = (isFinite(rightPct) ? rightPct : 0) + '%';
+    this.rightHpBar.style.background = this._hpGradient(rightPct);
+    this.rightHpText.textContent = Math.ceil(rightTotalHp) + '/' + rightTotalMaxHp;
   }
 
   _hpGradient(pct) {
@@ -253,13 +317,14 @@ class UIManager {
      Result Screen
      ═══════════════════════════════════════════════════════ */
 
-  showResult(winner, battleTime) {
-    if (winner) {
+  showResult(winnerSide, battleTime) {
+    if (window.soundSystem) window.soundSystem.playVictorySound();
+    
+    if (winnerSide) {
       this.resultTitle.textContent = '🏆 胜利!';
-      const winnerName = winner.charData.nameCN || winner.charData.name;
-      this.resultWinner.textContent = winnerName;
-      this.resultWinner.style.color = winner.charData.color;
-      this.resultWinner.style.textShadow = `0 0 20px ${winner.charData.color}`;
+      this.resultWinner.textContent = winnerSide === 'left' ? '左方队伍' : '右方队伍';
+      this.resultWinner.style.color = winnerSide === 'left' ? '#00E5FF' : '#FF3D00';
+      this.resultWinner.style.textShadow = `0 0 20px ${winnerSide === 'left' ? '#00E5FF' : '#FF3D00'}`;
     } else {
       this.resultTitle.textContent = '🤝 平局!';
       this.resultWinner.textContent = '势均力敌';
@@ -269,6 +334,9 @@ class UIManager {
 
     this.resultTime.textContent = `战斗时间: ${battleTime.toFixed(1)}s`;
     this.showScreen('result');
+    
+    // Auto-focus the rematch button when screen appears
+    setTimeout(() => this.rematchBtn.focus(), 50);
   }
 
   hideResult() {
@@ -301,17 +369,123 @@ class UIManager {
 
   _setupEventListeners() {
     this.startBtn.addEventListener('click', () => {
+      if (window.soundSystem) {
+        window.soundSystem.init();
+        window.soundSystem.playStartBattleSound();
+      }
       if (this.selectedLeft && this.selectedRight && this._onStartBattle) {
         this._onStartBattle(this.selectedLeft, this.selectedRight);
       }
     });
 
     this.rematchBtn.addEventListener('click', () => {
+      if (window.soundSystem) {
+        window.soundSystem.init();
+        window.soundSystem.playClickSound();
+      }
       if (this._onRematch) this._onRematch();
     });
 
     this.reselectBtn.addEventListener('click', () => {
+      if (window.soundSystem) {
+        window.soundSystem.init();
+        window.soundSystem.playClickSound();
+      }
       if (this._onReselect) this._onReselect();
+    });
+
+    const openCodexBtn = document.getElementById('open-codex-btn');
+    const closeCodexBtn = document.getElementById('close-codex-btn');
+    if (openCodexBtn) {
+      openCodexBtn.addEventListener('click', () => {
+        if (window.soundSystem) {
+          window.soundSystem.init();
+          window.soundSystem.playClickSound();
+        }
+        this._populateCodex();
+        this.showScreen('codex');
+      });
+    }
+    if (closeCodexBtn) {
+      closeCodexBtn.addEventListener('click', () => {
+        if (window.soundSystem) window.soundSystem.playClickSound();
+        this.showScreen('select');
+      });
+    }
+
+    // Keyboard navigation for result screen
+    document.addEventListener('keydown', (e) => {
+      const resultScreen = document.getElementById('result-screen');
+      if (resultScreen && !resultScreen.style.display.includes('none') && resultScreen.style.display !== 'none') {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'a' || e.key === 'd') {
+          if (document.activeElement === this.rematchBtn) {
+            this.reselectBtn.focus();
+          } else {
+            this.rematchBtn.focus();
+          }
+          e.preventDefault();
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          // If focus was lost, default to rematch on enter
+          if (document.activeElement !== this.rematchBtn && document.activeElement !== this.reselectBtn) {
+            this.rematchBtn.click();
+            e.preventDefault();
+          }
+        }
+      }
+    });
+  }
+
+  _populateCodex() {
+    const codexGrid = document.getElementById('codex-grid');
+    if (!codexGrid) return;
+    codexGrid.innerHTML = '';
+
+    const charIds = Object.keys(CHARACTERS);
+    charIds.forEach(id => {
+      const char = CHARACTERS[id];
+      // Only show visible characters in codex (unless we want to show hidden minions too? Let's show all to be fully detailed)
+      const isHidden = char.hidden ? '<span style="color: #ff5252; font-size: 0.8em; margin-left: 8px;">(隐藏角色)</span>' : '';
+
+      const card = document.createElement('div');
+      card.className = 'codex-card';
+
+      let lifestealText = char.lifesteal > 0 ? (char.lifesteal * 100).toFixed(0) + '%' : '无';
+      let weaponText = char.weaponType === 'melee' ? '近战' : '远程';
+      
+      card.innerHTML = `
+        <div class="codex-card-header">
+          <div class="codex-icon" style="background-color: ${char.color}; border: 2px solid ${char.secondaryColor};"></div>
+          <div class="codex-title">
+            <h2>${char.nameCN}${isHidden}</h2>
+            <p>${char.name}</p>
+          </div>
+        </div>
+        <div class="codex-stats">
+          <div class="stat-item"><span class="stat-label">血量 (HP)</span><span class="stat-value hp">${char.hp}</span></div>
+          <div class="stat-item"><span class="stat-label">攻击力 (ATK)</span><span class="stat-value damage">${char.attackPower}</span></div>
+          <div class="stat-item"><span class="stat-label">攻速 (ATK SPD)</span><span class="stat-value">${char.attackSpeed}s/次</span></div>
+          <div class="stat-item"><span class="stat-label">射程 (RANGE)</span><span class="stat-value">${char.attackRange}</span></div>
+          <div class="stat-item"><span class="stat-label">移速 (SPEED)</span><span class="stat-value speed">${char.speed}</span></div>
+          <div class="stat-item"><span class="stat-label">武器 (WEAPON)</span><span class="stat-value">${weaponText}</span></div>
+          <div class="stat-item"><span class="stat-label">吸血 (LIFESTEAL)</span><span class="stat-value">${lifestealText}</span></div>
+          <div class="stat-item"><span class="stat-label">施法前摇</span><span class="stat-value">${char.chargeTime}s</span></div>
+          <div class="stat-item"><span class="stat-label">移动模式</span><span class="stat-value">${char.movePattern}</span></div>
+          <div class="stat-item"><span class="stat-label">AI倾向</span><span class="stat-value">${char.aiTendency}</span></div>
+        </div>
+        <div class="codex-skill">
+          <div class="skill-header">
+            <span class="skill-name">⭐ ${char.skill.name}</span>
+            <span class="skill-cd">CD: ${char.skill.cooldown}s</span>
+          </div>
+          <p class="skill-desc">
+            类型: ${char.skill.type} <br/>
+            伤害: ${char.skill.damage} <br/>
+            射程: ${char.skill.range} <br/>
+            持续时间: ${char.skill.duration}s
+          </p>
+        </div>
+      `;
+      codexGrid.appendChild(card);
     });
   }
 }

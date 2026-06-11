@@ -83,6 +83,11 @@ class Fighter {
     this.clones = [];
     this.cloneTimer = 0;
 
+    // Superhero-specific mechanics
+    this.bloodShield = 0;
+    this.bloodShieldCooldown = 0;
+    this.whistleCooldown = 0;
+
     // Reference to enemy target (set externally)
     this.target = null;
   }
@@ -99,6 +104,42 @@ class Fighter {
     this.state = newState;
     this.stateTimer = 0;
     this.attackExecuted = false; // Reset attack execution flag
+  }
+
+  /**
+   * Find and set the closest alive enemy from the opposing team.
+   * Does not change target mid-attack/skill to avoid animation jitter.
+   * @param {Fighter[]} opposingTeam
+   */
+  findClosestTarget(opposingTeam) {
+    if (!opposingTeam || opposingTeam.length === 0) {
+      this.target = null;
+      return;
+    }
+
+    // If current target is alive and we are already committed to an attack/skill, keep it
+    if (this.target && this.target.isAlive() && 
+        (this.state === 'charge' || this.state === 'attack' || this.state === 'skill' || this.state === 'dashing_skill')) {
+      return;
+    }
+
+    let closest = null;
+    let minDist = Infinity;
+
+    for (let i = 0; i < opposingTeam.length; i++) {
+      const enemy = opposingTeam[i];
+      if (enemy.isAlive()) {
+        const dx = enemy.x - this.x;
+        const dy = enemy.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = enemy;
+        }
+      }
+    }
+
+    this.target = closest;
   }
 
   /**
@@ -139,11 +180,23 @@ class Fighter {
    * @param {number} arenaX - Arena left offset (optional, default 0)
    * @param {number} arenaY - Arena top offset (optional, default 0)
    */
-  update(dt, weaponSystem, effectSystem, arenaWidth, arenaHeight, arenaX, arenaY) {
+  update(dt, weaponSystem, effectSystem, arenaWidth, arenaHeight, arenaX, arenaY, opposingTeam) {
     arenaX = arenaX || 0;
     arenaY = arenaY || 0;
+    arenaWidth = arenaWidth || 800;
+    arenaHeight = arenaHeight || 500;
+
+    // Sanitize state variables at start of update to prevent NaN propagation
+    if (typeof this.x !== 'number' || !isFinite(this.x)) this.x = arenaX + arenaWidth / 2;
+    if (typeof this.y !== 'number' || !isFinite(this.y)) this.y = arenaY + arenaHeight / 2;
+    if (typeof this.hp !== 'number' || !isFinite(this.hp)) this.hp = this.maxHp;
+    if (typeof this.angle !== 'number' || !isFinite(this.angle)) this.angle = this.team === 'left' ? 0 : Math.PI;
+
     // Dead fighters don't update beyond death animation
     if (!this.alive && this.state !== 'dead') return;
+
+    // Find closest target dynamically
+    this.findClosestTarget(opposingTeam);
 
     // ── Update all timers ──
     this.stateTimer += dt;
@@ -156,6 +209,56 @@ class Fighter {
     this.cloneTimer = Math.max(0, this.cloneTimer - dt);
     this.skillReady = (this.skillCooldown <= 0);
 
+    // Superhero timers
+    if (this.bloodShieldCooldown > 0) this.bloodShieldCooldown = Math.max(0, this.bloodShieldCooldown - dt);
+    if (this.whistleCooldown > 0) this.whistleCooldown = Math.max(0, this.whistleCooldown - dt);
+
+    // Train Conductor Steam Whistle (Defensive Knockback)
+    if (this.charData.id === 'train_conductor' && (!this.whistleCooldown || this.whistleCooldown <= 0) && this.stunTimer <= 0) {
+      if (opposingTeam) {
+        let triggered = false;
+        opposingTeam.forEach(enemy => {
+          if (enemy.isAlive()) {
+            // Safety check for self and enemy coordinates
+            if (!isFinite(this.x)) this.x = 400;
+            if (!isFinite(this.y)) this.y = 300;
+            if (!isFinite(enemy.x)) enemy.x = 400;
+            if (!isFinite(enemy.y)) enemy.y = 300;
+
+            const dx = enemy.x - this.x;
+            const dy = enemy.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 100) {
+              triggered = true;
+              
+              // Knock back enemy safely
+              let kbAngle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+              if (isNaN(kbAngle) || !isFinite(kbAngle)) kbAngle = 0;
+              const kbDist = 80;
+              const nextX = enemy.x + Math.cos(kbAngle) * kbDist;
+              const nextY = enemy.y + Math.sin(kbAngle) * kbDist;
+              
+              if (isFinite(nextX)) enemy.x = nextX;
+              if (isFinite(nextY)) enemy.y = nextY;
+              
+              // Apply slow debuff (50% slow for 2s)
+              enemy.slowTimer = 2.0;
+              effectSystem.addHitEffect(enemy.x, enemy.y, '#FFD700');
+              effectSystem.addDamageNumber(enemy.x, enemy.y - enemy.charData.size, '击退 & 减慢!', false, '#FFD700');
+            }
+          }
+        });
+        
+        if (triggered) {
+          this.whistleCooldown = 6.0;
+          // Whistle golden shockwave and TOOT! text
+          effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#FFD700', 100);
+          effectSystem.screenShake(6);
+          effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '鸣笛 TOOT!', false, '#FFD700');
+        }
+      }
+    }
+
     // Clear clones when timer expires
     if (this.cloneTimer <= 0 && this.clones.length > 0) {
       this.clones = [];
@@ -163,12 +266,22 @@ class Fighter {
 
     // ── Stunned: skip all actions ──
     if (this.stunTimer > 0) {
+      // Still clamp coordinates and sanitize!
+      if (typeof this.x !== 'number' || !isFinite(this.x)) this.x = arenaX + arenaWidth / 2;
+      if (typeof this.y !== 'number' || !isFinite(this.y)) this.y = arenaY + arenaHeight / 2;
+      this.x = Math.max(arenaX + 30, Math.min(arenaX + arenaWidth - 30, this.x));
+      this.y = Math.max(arenaY + 30, Math.min(arenaY + arenaHeight - 30, this.y));
       return;
     }
 
     // ── Update facing angle toward target ──
     if (this.target && this.target.isAlive()) {
-      this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+      if (isFinite(this.target.x) && isFinite(this.target.y) && isFinite(this.x) && isFinite(this.y)) {
+        this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+      }
+    }
+    if (typeof this.angle !== 'number' || !isFinite(this.angle)) {
+      this.angle = this.team === 'left' ? 0 : Math.PI;
     }
 
     // ── State machine ──
@@ -208,15 +321,16 @@ class Fighter {
         // Apply AI behavior modifications
         this.updateAI(dt, arenaWidth, arenaHeight);
 
-        if (dist <= this.charData.attackRange && this.attackTimer <= 0) {
-          // Check skill first
-          if (this.skillReady && dist <= this.charData.skill.range) {
-            var skillChance = this.getSkillChance();
-            if (Math.random() < skillChance) {
-              this.setState('skill');
-              break;
-            }
+        // Check skill first (every frame while chasing, if ready and target in range)
+        if (this.skillReady && dist <= this.charData.skill.range) {
+          var skillChance = this.getSkillChance();
+          if (Math.random() < skillChance) {
+            this.setState('skill');
+            break;
           }
+        }
+
+        if (dist <= this.charData.attackRange && this.attackTimer <= 0) {
           // Normal attack
           this.setState('charge');
         }
@@ -320,11 +434,16 @@ class Fighter {
         }
 
         this.dashTimer += dt;
-        var dashPct = Math.min(1, this.dashTimer / this.dashDuration);
+        var duration = this.dashDuration || 0.1;
+        if (duration <= 0) duration = 0.1;
+        var dashPct = Math.min(1, this.dashTimer / duration);
+        if (isNaN(dashPct) || !isFinite(dashPct)) dashPct = 1;
         
         // Linear interpolation for smooth dash coordinates
-        this.x = this.dashStartX + (this.dashTargetX - this.dashStartX) * dashPct;
-        this.y = this.dashStartY + (this.dashTargetY - this.dashStartY) * dashPct;
+        var nextDashX = this.dashStartX + (this.dashTargetX - this.dashStartX) * dashPct;
+        var nextDashY = this.dashStartY + (this.dashTargetY - this.dashStartY) * dashPct;
+        if (isFinite(nextDashX)) this.x = nextDashX;
+        if (isFinite(nextDashY)) this.y = nextDashY;
 
         // Visual trails during dash
         if (effectSystem) {
@@ -364,7 +483,24 @@ class Fighter {
         break;
     }
 
-    // ── Clamp position to arena bounds ──
+    // ── Clamp position to arena bounds & sanitize NaN ──
+    if (typeof this.x !== 'number' || !isFinite(this.x)) {
+      this.x = arenaX + arenaWidth / 2;
+    }
+    if (typeof this.y !== 'number' || !isFinite(this.y)) {
+      this.y = arenaY + arenaHeight / 2;
+    }
+    if (typeof this.hp !== 'number' || !isFinite(this.hp)) {
+      this.hp = this.maxHp;
+    }
+    if (typeof this.angle !== 'number' || !isFinite(this.angle)) {
+      this.angle = this.team === 'left' ? 0 : Math.PI;
+    }
+    if (!isFinite(this.stunTimer)) this.stunTimer = 0;
+    if (!isFinite(this.slowTimer)) this.slowTimer = 0;
+    if (!isFinite(this.attackTimer)) this.attackTimer = 0;
+    if (!isFinite(this.skillCooldown)) this.skillCooldown = 0;
+
     this.x = Math.max(arenaX + 30, Math.min(arenaX + arenaWidth - 30, this.x));
     this.y = Math.max(arenaY + 30, Math.min(arenaY + arenaHeight - 30, this.y));
   }
@@ -401,6 +537,26 @@ class Fighter {
       );
 
       if (result.hit && this.target.isAlive()) {
+        // One Punch Man normal attack explosion:
+        if (this.charData.id === 'one_punch_man') {
+          effectSystem.addSkillEffect('meteor', this.target.x, this.target.y, '#FFD700', 70);
+          effectSystem.screenShake(5);
+          
+          const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+          if (opposingTeam) {
+            opposingTeam.forEach(enemy => {
+              if (enemy.isAlive() && enemy !== this.target) {
+                const ex = enemy.x - this.target.x;
+                const ey = enemy.y - this.target.y;
+                const edist = Math.sqrt(ex * ex + ey * ey);
+                if (edist <= 70) {
+                  enemy.takeDamage(result.damage * 0.5, this.x, this.y, effectSystem);
+                }
+              }
+            });
+          }
+        }
+
         this.target.takeDamage(result.damage, this.x, this.y, effectSystem);
 
         // Lifesteal
@@ -411,16 +567,31 @@ class Fighter {
         effectSystem.addHitEffect(this.target.x, this.target.y, this.charData.color);
         effectSystem.screenShake(3);
       }
+      if (window.soundSystem) window.soundSystem.playSwingSound();
     } else {
-      // Ranged: spawn projectile
-      weaponSystem.createRangedAttack(
-        this.x, this.y,
-        this.target.x, this.target.y,
-        this.charData.attackPower,
-        this.team,
-        this.charData.projectileType,
-        this.charData.color
-      );
+      // Ranged: spawn projectile or summon (for super_summoner)
+      if (this.charData.id === 'super_summoner') {
+        const teamArr = this.team === 'left' ? window.combatManager.fightersLeft : window.combatManager.fightersRight;
+        if (teamArr) {
+          var spawnX = this.x + (Math.random() - 0.5) * 60;
+          var spawnY = this.y + (Math.random() - 0.5) * 60;
+          var minion = new Fighter('summoned_golem', spawnX, spawnY, this.team);
+          teamArr.push(minion);
+          effectSystem.addSkillEffect('clone', spawnX, spawnY, '#E040FB', 30);
+          if (window.soundSystem) window.soundSystem.playSummonSound();
+        }
+      } else {
+        weaponSystem.createRangedAttack(
+          this.x, this.y,
+          this.target.x, this.target.y,
+          this.charData.attackPower,
+          this.team,
+          this.charData.projectileType,
+          this.charData.color,
+          this
+        );
+        if (window.soundSystem) window.soundSystem.playShootSound();
+      }
     }
   }
 
@@ -446,7 +617,11 @@ class Fighter {
     var dx = this.target.x - this.x;
     var dy = this.target.y - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 1) dist = 1; // Avoid division by zero
+    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
+      dx = 0;
+      dy = 0;
+      dist = 1;
+    }
 
     switch (this.charData.movePattern) {
 
@@ -491,10 +666,13 @@ class Fighter {
         var toDx = orbitX - this.x;
         var toDy = orbitY - this.y;
         var toDist = Math.sqrt(toDx * toDx + toDy * toDy);
-        if (toDist > 1) {
-          this.x += (toDx / toDist) * moveSpeed;
-          this.y += (toDy / toDist) * moveSpeed;
+        if (!isFinite(toDx) || !isFinite(toDy) || !isFinite(toDist) || toDist < 1) {
+          toDx = 0;
+          toDy = 0;
+          toDist = 1;
         }
+        this.x += (toDx / toDist) * moveSpeed;
+        this.y += (toDy / toDist) * moveSpeed;
         break;
       }
 
@@ -503,8 +681,10 @@ class Fighter {
         // Handle active short dash movement
         if (this.shortDashTimer > 0) {
           this.shortDashTimer -= dt;
-          this.x += this.shortDashVx * dt;
-          this.y += this.shortDashVy * dt;
+          if (isFinite(this.shortDashVx) && isFinite(this.shortDashVy)) {
+            this.x += this.shortDashVx * dt;
+            this.y += this.shortDashVy * dt;
+          }
           
           if (effectSystem && Math.random() < 0.4) {
             effectSystem.addTrail(this.x, this.y, this.charData.color + '60', 3);
@@ -561,10 +741,13 @@ class Fighter {
         var fDy = behindY - this.y;
         var fDist = Math.sqrt(fDx * fDx + fDy * fDy);
 
-        if (fDist > 1) {
-          this.x += (fDx / fDist) * moveSpeed;
-          this.y += (fDy / fDist) * moveSpeed;
+        if (!isFinite(fDx) || !isFinite(fDy) || !isFinite(fDist) || fDist < 1) {
+          fDx = 0;
+          fDy = 0;
+          fDist = 1;
         }
+        this.x += (fDx / fDist) * moveSpeed;
+        this.y += (fDy / fDist) * moveSpeed;
         break;
       }
 
@@ -658,13 +841,23 @@ class Fighter {
     var dx = this.target.x - this.x;
     var dy = this.target.y - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 1) dist = 1;
+    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
+      dx = 0;
+      dy = 0;
+      dist = 1;
+    }
 
     if (this.repositionType === 'waypoint') {
       // Move towards the designated waypoint (full-map kiting)
       var wpDx = this.repositionWaypointX - this.x;
       var wpDy = this.repositionWaypointY - this.y;
       var wpDist = Math.sqrt(wpDx * wpDx + wpDy * wpDy);
+
+      if (!isFinite(wpDx) || !isFinite(wpDy) || !isFinite(wpDist) || wpDist < 1) {
+        wpDx = 0;
+        wpDy = 0;
+        wpDist = 1;
+      }
 
       if (wpDist > 10) {
         this.x += (wpDx / wpDist) * moveSpeed;
@@ -729,6 +922,11 @@ class Fighter {
     var dx = this.target.x - this.x;
     var dy = this.target.y - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
+    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
+      dx = 0;
+      dy = 0;
+      dist = 1;
+    }
 
     switch (this.charData.aiTendency) {
       case 'aggressive':
@@ -789,22 +987,89 @@ class Fighter {
   takeDamage(damage, attackerX, attackerY, effectSystem) {
     if (!this.alive) return;
 
+    // Ensure this fighter's coordinates and health are valid
+    if (typeof this.x !== 'number' || !isFinite(this.x)) this.x = 400;
+    if (typeof this.y !== 'number' || !isFinite(this.y)) this.y = 300;
+    if (typeof this.hp !== 'number' || !isFinite(this.hp)) this.hp = this.maxHp;
+
+    // Ensure all incoming inputs are valid numbers to prevent NaN propagation
+    if (typeof damage !== 'number' || !isFinite(damage)) {
+      damage = 0;
+    }
+    if (typeof attackerX !== 'number' || !isFinite(attackerX)) {
+      attackerX = this.x;
+    }
+    if (typeof attackerY !== 'number' || !isFinite(attackerY)) {
+      attackerY = this.y;
+    }
+
+    // Saitama Passive Dodge:
+    if (this.charData.id === 'one_punch_man' && Math.random() < 0.35) {
+      effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '闪避!', false, '#FFFFFF');
+      effectSystem.addHitEffect(this.x, this.y, '#FFFFFF');
+      return;
+    }
+
+    // Blood Demon Shield Trigger:
+    if (this.charData.id === 'blood_demon') {
+      // If shield is active, absorb damage
+      if (this.bloodShield && this.bloodShield > 0) {
+        if (damage >= this.bloodShield) {
+          damage -= this.bloodShield;
+          this.bloodShield = 0;
+          effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '护盾破碎!', false, '#FF1744');
+        } else {
+          this.bloodShield -= damage;
+          effectSystem.addDamageNumber(this.x, this.y - this.charData.size, `吸收 ${Math.floor(damage)}`, false, '#FF5252');
+          damage = 0;
+        }
+      }
+
+      // If HP drops below 45% and shield is off cooldown, trigger it
+      if (damage > 0 && this.hp - damage < 45 && (!this.bloodShieldCooldown || this.bloodShieldCooldown <= 0)) {
+        this.bloodShield = 35;
+        this.bloodShieldCooldown = 15.0; // 15s cooldown
+        effectSystem.addHealEffect(this.x, this.y);
+        effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '+血红护盾!', false, '#FF1744');
+        effectSystem.addSkillEffect('clone', this.x, this.y, '#FF1744', 40);
+      }
+    }
+
+    if (damage <= 0) return;
+
     this.hp -= damage;
     this.hp = Math.max(0, this.hp);
+
+    // Final safety: if hp is still somehow non-finite, reset it
+    if (!isFinite(this.hp)) {
+      console.warn('[NaN TRACE] hp became NaN after takeDamage! damage=', damage, 'charId=', this.charData.id, 'attackerX=', attackerX, 'attackerY=', attackerY);
+      this.hp = 0;
+    }
 
     // Visual feedback
     this.hitFlashTimer = 0.15;
     effectSystem.addHitEffect(this.x, this.y, this.charData.color);
     effectSystem.addDamageNumber(this.x, this.y - this.charData.size, damage, false, '#FF4444');
+    
+    // Play hit sound
+    if (window.soundSystem) window.soundSystem.playHitSound();
 
     // Knockback (5-8px away from attacker)
     var kbAngle = Math.atan2(this.y - attackerY, this.x - attackerX);
+    if (isNaN(kbAngle) || !isFinite(kbAngle)) kbAngle = 0;
     var kbDist = 5 + Math.random() * 3;
-    this.x += Math.cos(kbAngle) * kbDist;
-    this.y += Math.sin(kbAngle) * kbDist;
+    
+    var nextX = this.x + Math.cos(kbAngle) * kbDist;
+    var nextY = this.y + Math.sin(kbAngle) * kbDist;
+    if (isFinite(nextX)) this.x = nextX;
+    if (isFinite(nextY)) this.y = nextY;
+
+    if (!isFinite(this.x)) this.x = attackerX;
+    if (!isFinite(this.y)) this.y = attackerY;
 
     // State transition
     if (this.hp <= 0) {
+      if (window.soundSystem) window.soundSystem.playDeathSound();
       this.setState('dead');
     } else if (this.state !== 'attack' && this.state !== 'skill' && this.state !== 'reposition' && this.state !== 'dashing_skill' && this.state !== 'dead') {
       this.setState('hit');
@@ -818,7 +1083,12 @@ class Fighter {
    */
   heal(amount, effectSystem) {
     if (!this.alive) return;
+    if (typeof amount !== 'number' || !isFinite(amount)) {
+      amount = 0;
+    }
     this.hp = Math.min(this.maxHp, this.hp + amount);
+    // Final safety
+    if (!isFinite(this.hp)) this.hp = this.maxHp;
     effectSystem.addHealEffect(this.x, this.y);
   }
 
@@ -840,6 +1110,11 @@ class Fighter {
     var dx = this.target.x - this.x;
     var dy = this.target.y - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
+    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
+      dx = 0;
+      dy = 0;
+      dist = 1;
+    }
 
     if (this.dashSkillType === 'dash') {
       // Vampire dash damage & heal
@@ -857,6 +1132,25 @@ class Fighter {
         effectSystem.addDamageNumber(this.target.x, this.target.y - 40, skill.damage, true, '#FFD700');
         effectSystem.addSkillEffect('backstab', this.target.x, this.target.y, this.charData.color, 20);
         effectSystem.screenShake(7);
+      }
+    } else if (this.dashSkillType === 'serious_punch') {
+      // One Punch Man serious punch
+      effectSystem.addSkillEffect('meteor', this.x, this.y, '#FFD700', 90);
+      effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#FF1744', 130);
+      effectSystem.screenShake(18);
+
+      const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+      if (opposingTeam) {
+        opposingTeam.forEach(enemy => {
+          if (enemy.isAlive()) {
+            const ex = enemy.x - this.x;
+            const ey = enemy.y - this.y;
+            const edist = Math.sqrt(ex * ex + ey * ey);
+            if (edist <= 130) {
+              enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
+            }
+          }
+        });
       }
     }
 
@@ -880,26 +1174,43 @@ class Fighter {
    * @param {EffectSystem} effectSystem
    */
   executeSkill(weaponSystem, effectSystem) {
+    if (window.soundSystem) window.soundSystem.playSkillSound();
+
     if (!this.target || !this.target.isAlive()) return;
 
     var skill = this.charData.skill;
     var dx = this.target.x - this.x;
     var dy = this.target.y - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
+    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
+      dx = 0;
+      dy = 0;
+      dist = 1;
+    }
 
     switch (skill.type) {
 
       // ── WHIRLWIND (Swordsman): AOE damage around self ──
       case 'aoe_melee': {
         effectSystem.addSkillEffect('aoe_melee', this.x, this.y, this.charData.color, skill.range);
-
-        if (this.target.isAlive() && dist <= skill.range) {
-          this.target.takeDamage(skill.damage, this.x, this.y, effectSystem);
-          if (this.charData.lifesteal > 0) {
-            this.heal(skill.damage * this.charData.lifesteal, effectSystem);
-          }
-        }
         effectSystem.screenShake(6);
+
+        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+        if (opposingTeam) {
+          opposingTeam.forEach(enemy => {
+            if (enemy.isAlive()) {
+              const ex = enemy.x - this.x;
+              const ey = enemy.y - this.y;
+              const edist = Math.sqrt(ex * ex + ey * ey);
+              if (edist <= skill.range) {
+                enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
+                if (this.charData.lifesteal > 0) {
+                  this.heal(skill.damage * this.charData.lifesteal, effectSystem);
+                }
+              }
+            }
+          });
+        }
         break;
       }
 
@@ -910,7 +1221,7 @@ class Fighter {
 
         for (var i = -1; i <= 1; i++) {
           var shotAngle = baseAngle + i * spreadAngle;
-          var speed = 400;
+          var speed = this.charData.projectileSpeed || 400;
           var vx = Math.cos(shotAngle) * speed;
           var vy = Math.sin(shotAngle) * speed;
 
@@ -919,6 +1230,7 @@ class Fighter {
             skill.damage, this.team,
             this.charData.color, 5, 'arrow'
           );
+          proj.attacker = this;
           weaponSystem.projectiles.push(proj);
         }
 
@@ -928,12 +1240,26 @@ class Fighter {
 
       // ── METEOR (Mage): AOE damage at target location ──
       case 'meteor': {
-        effectSystem.addSkillEffect('meteor', this.target.x, this.target.y, this.charData.color, skill.area || 80);
-
-        if (dist <= skill.range && this.target.isAlive()) {
-          this.target.takeDamage(skill.damage, this.x, this.y, effectSystem);
-        }
+        const area = skill.area || 80;
+        effectSystem.addSkillEffect('meteor', this.target.x, this.target.y, this.charData.color, area);
         effectSystem.screenShake(10);
+
+        const targetX = this.target.x;
+        const targetY = this.target.y;
+
+        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+        if (opposingTeam) {
+          opposingTeam.forEach(enemy => {
+            if (enemy.isAlive()) {
+              const ex = enemy.x - targetX;
+              const ey = enemy.y - targetY;
+              const edist = Math.sqrt(ex * ex + ey * ey);
+              if (edist <= area) {
+                enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
+              }
+            }
+          });
+        }
         break;
       }
 
@@ -978,7 +1304,8 @@ class Fighter {
             this.clones[i].x, this.clones[i].y,
             this.target.x, this.target.y,
             skill.damage, this.team,
-            'shuriken', this.charData.color
+            'shuriken', this.charData.color,
+            this
           );
         }
         break;
@@ -1022,13 +1349,100 @@ class Fighter {
           this.x, this.y,
           this.target.x, this.target.y,
           skill.damage, this.team,
-          'banana', this.charData.color
+          'banana', this.charData.color,
+          this
         );
 
         if (this.target.isAlive() && dist <= skill.range) {
           this.target.slowTimer = skill.duration; // Apply slow!
           effectSystem.addSkillEffect('slow', this.target.x, this.target.y, '#42A5F5', 40);
         }
+        break;
+      }
+
+      // ── SERIOUS PUNCH (Saitama): Smooth super fast lunge ──
+      case 'serious_punch': {
+        // Calculate destination (stop 20px away from target)
+        var dashDestX = this.x;
+        var dashDestY = this.y;
+        if (dist > 20) {
+          dashDestX = this.target.x - (dx / dist) * 20;
+          dashDestY = this.target.y - (dy / dist) * 20;
+        }
+
+        this.setState('dashing_skill');
+        this.dashStartX = this.x;
+        this.dashStartY = this.y;
+        this.dashTargetX = dashDestX;
+        this.dashTargetY = dashDestY;
+        this.dashDuration = 0.08; // Very fast lunge!
+        this.dashTimer = 0;
+        this.dashSkillType = 'serious_punch';
+
+        effectSystem.addSkillEffect('dash', this.x, this.y, this.charData.color, 30);
+        break;
+      }
+
+      // ── SUMMON BATS (Blood Demon): Summons 4 homing siphoning bats ──
+      case 'summon_bats': {
+        var baseAngle = Math.atan2(dy, dx);
+        var spread = Math.PI / 3; // 60 degrees spread
+        var numBats = 4;
+        for (var i = 0; i < numBats; i++) {
+          var angleOffset = (i - (numBats - 1) / 2) * (spread / (numBats - 1));
+          var batAngle = baseAngle + angleOffset;
+          var speed = 250; // Homing will guide them
+          var vx = Math.cos(batAngle) * speed;
+          var vy = Math.sin(batAngle) * speed;
+          
+          var batProj = new Projectile(
+            this.x, this.y, vx, vy,
+            skill.damage, this.team,
+            '#FF1744', 8, 'bat'
+          );
+          batProj.attacker = this;
+          weaponSystem.projectiles.push(batProj);
+        }
+        effectSystem.addSkillEffect('clone', this.x, this.y, '#FF1744', 40);
+        effectSystem.screenShake(4);
+        break;
+      }
+
+      // ── TRAIN STAMPEDE (Train Conductor): Summons linear stun train ──
+      case 'train_stampede': {
+        var baseAngle = Math.atan2(dy, dx);
+        var speed = 300;
+        var vx = Math.cos(baseAngle) * speed;
+        var vy = Math.sin(baseAngle) * speed;
+
+        var proj = weaponSystem.createRangedAttack(
+          this.x, this.y,
+          this.target.x, this.target.y,
+          skill.damage, this.team,
+          'train', this.charData.color,
+          this
+        );
+
+        effectSystem.screenShake(5);
+        effectSystem.addSkillEffect('multi_shot', this.x, this.y, this.charData.color, 40);
+        break;
+      }
+
+      // ── SUMMON LEGION (Superhero Summoner): Summons 3 Stone Golems ──
+      case 'summon_legion': {
+        const teamArr = this.team === 'left' ? window.combatManager.fightersLeft : window.combatManager.fightersRight;
+        if (teamArr) {
+          for (var i = 0; i < 3; i++) {
+            var spawnX = this.x + (Math.random() - 0.5) * 80;
+            var spawnY = this.y + (Math.random() - 0.5) * 80;
+            var minion = new Fighter('summoned_golem', spawnX, spawnY, this.team);
+            teamArr.push(minion);
+            effectSystem.addSkillEffect('clone', spawnX, spawnY, '#E040FB', 40);
+          }
+          if (window.soundSystem) window.soundSystem.playSummonSound();
+        }
+        effectSystem.screenShake(8);
+        effectSystem.addSkillEffect('meteor', this.x, this.y, '#9C27B0', 60);
         break;
       }
     }
@@ -1048,6 +1462,23 @@ class Fighter {
 
     ctx.save();
 
+    // ── Foot ground indicator ring (for team color) ──
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = this.team === 'left' ? '#00E5FF' : '#FF3D00';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.charData.size * 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = this.team === 'left' ? '#00E5FF' : '#FF3D00';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]); // Dashed ring
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.charData.size * 1.3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
     // ── Body circle with glow ──
     ctx.shadowColor = this.charData.glowColor;
     ctx.shadowBlur = 12;
@@ -1061,6 +1492,20 @@ class Fighter {
     ctx.strokeStyle = this.charData.secondaryColor;
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    // Render Blood Shield Bubble
+    if (this.charData.id === 'blood_demon' && this.bloodShield > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 23, 68, 0.85)';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#FF1744';
+      ctx.shadowBlur = 8;
+      ctx.setLineDash([4, 2]); // dotted shield line
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.charData.size * 1.25 + Math.sin(time * 10) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // ── Hit flash (white overlay) ──
     if (this.hitFlashTimer > 0) {

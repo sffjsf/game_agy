@@ -100,10 +100,11 @@ const CHARACTERS = {
     size: 36,
     speed: 4.5,
     hp: 100,
-    attackPower: 14,
-    attackSpeed: 1.3,
+    attackPower: 11,
+    attackSpeed: 1.1,
     chargeTime: 0.4,
-    attackRange: 250,
+    attackRange: 420,
+    projectileSpeed: 1000,
     lifesteal: 0,
     movePattern: 'keepDistance',
     aiTendency: 'cautious',
@@ -180,10 +181,11 @@ const CHARACTERS = {
     size: 36,
     speed: 3.6,
     hp: 100,
-    attackPower: 20,
-    attackSpeed: 1.9,
+    attackPower: 16,
+    attackSpeed: 1.6,
     chargeTime: 0.8,
-    attackRange: 240,
+    attackRange: 400,
+    projectileSpeed: 800,
     lifesteal: 0,
     movePattern: 'arc',
     aiTendency: 'cautious',
@@ -358,10 +360,11 @@ const CHARACTERS = {
     size: 36,
     speed: 5.2,
     hp: 100,
-    attackPower: 10,
-    attackSpeed: 0.8,
+    attackPower: 8,
+    attackSpeed: 0.65,
     chargeTime: 0.2,
-    attackRange: 180,
+    attackRange: 320,
+    projectileSpeed: 1200,
     lifesteal: 0,
     movePattern: 'zigzag',
     aiTendency: 'balanced',
@@ -629,10 +632,11 @@ const CHARACTERS = {
     size: 36,
     speed: 4.3,
     hp: 100,
-    attackPower: 12,
-    attackSpeed: 1.0,
+    attackPower: 10,
+    attackSpeed: 0.85,
     chargeTime: 0.3,
-    attackRange: 200,
+    attackRange: 340,
+    projectileSpeed: 900,
     lifesteal: 0.05,
     movePattern: 'wobble',
     aiTendency: 'balanced',
@@ -723,6 +727,379 @@ const CHARACTERS = {
       ctx.strokeStyle = '#FDD835';
       ctx.lineWidth = 2;
       ctx.stroke();
+
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 9. ONE PUNCH MAN (一拳超人) - Melee Superhero
+  // ═══════════════════════════════════════════════════════════════
+  one_punch_man: {
+    id: 'one_punch_man',
+    name: 'One Punch Man',
+    nameCN: '一拳超人',
+    color: '#FFEB3B',
+    secondaryColor: '#D32F2F',
+    glowColor: 'rgba(255, 235, 59, 0.4)',
+    size: 36,
+    speed: 5.2,
+    hp: 100,
+    attackPower: 22,
+    attackSpeed: 0.8,
+    chargeTime: 0.2,
+    attackRange: 85,
+    lifesteal: 0,
+    movePattern: 'dash',
+    aiTendency: 'aggressive',
+    weaponType: 'melee',
+    projectileType: null,
+    skill: {
+      name: '认真一拳',
+      nameEN: 'Serious Punch',
+      cooldown: 14,
+      damage: 80,
+      range: 120,
+      type: 'serious_punch',
+      duration: 0
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // White Cape (drawn behind the body)
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#E0E0E0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.8, 0);
+      ctx.lineTo(-size * 2.2, -size * 0.6 + Math.sin(time * 8) * 4);
+      ctx.lineTo(-size * 2.0, size * 0.1);
+      ctx.lineTo(-size * 2.2, size * 0.6 - Math.sin(time * 8) * 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Red Gloves (two circles at the front)
+      ctx.fillStyle = '#D32F2F';
+      ctx.strokeStyle = '#B71C1C';
+      ctx.lineWidth = 1.5;
+      // Left glove
+      ctx.beginPath();
+      ctx.arc(size * 0.8, -size * 0.4, size * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Right glove
+      ctx.beginPath();
+      ctx.arc(size * 0.8, size * 0.4, size * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Simple black eyes/mouth (Saitama classic simple face)
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.fillRect(size * 0.4, -size * 0.2, 4, 2);
+      ctx.fillRect(size * 0.4, size * 0.2, 4, 2);
+      ctx.fillRect(size * 0.45, -2, 2, 4);
+
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 10. BLOOD DEMON (血魔) - Melee Lifesteal Superhero
+  // ═══════════════════════════════════════════════════════════════
+  blood_demon: {
+    id: 'blood_demon',
+    name: 'Blood Demon',
+    nameCN: '血魔',
+    color: '#880E4F',
+    secondaryColor: '#FF1744',
+    glowColor: 'rgba(255, 23, 68, 0.4)',
+    size: 36,
+    speed: 4.6,
+    hp: 100,
+    attackPower: 15,
+    attackSpeed: 1.1,
+    chargeTime: 0.3,
+    attackRange: 90,
+    lifesteal: 0.40, // 40% Lifesteal
+    movePattern: 'zigzag',
+    aiTendency: 'balanced',
+    weaponType: 'melee',
+    projectileType: null,
+    skill: {
+      name: '蝙蝠召唤',
+      nameEN: 'Summon Bats',
+      cooldown: 8,
+      damage: 22,
+      range: 250,
+      type: 'summon_bats',
+      duration: 0
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Blood wings (large crimson wings on back)
+      ctx.fillStyle = '#310015';
+      ctx.strokeStyle = '#FF1744';
+      ctx.lineWidth = 2;
+      
+      const wingSwing = Math.sin(time * 5) * 0.2;
+
+      // Left Wing
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.5, -size * 0.3);
+      ctx.lineTo(-size * 1.8, -size * 1.5 - wingSwing * size);
+      ctx.lineTo(-size * 1.2, -size * 0.5);
+      ctx.lineTo(-size * 2.2, -size * 0.2 - wingSwing * size);
+      ctx.lineTo(-size * 0.5, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Right Wing
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.5, size * 0.3);
+      ctx.lineTo(-size * 1.8, size * 1.5 + wingSwing * size);
+      ctx.lineTo(-size * 1.2, size * 0.5);
+      ctx.lineTo(-size * 2.2, size * 0.2 + wingSwing * size);
+      ctx.lineTo(-size * 0.5, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+
+      // Floating blood orb above
+      ctx.save();
+      const orbY = y - size - 15 + Math.sin(time * 6) * 5;
+      ctx.beginPath();
+      ctx.arc(x, orbY, 7, 0, Math.PI * 2);
+      var grad = ctx.createRadialGradient(x, orbY, 1, x, orbY, 7);
+      grad.addColorStop(0, '#FF5252');
+      grad.addColorStop(1, '#880E4F');
+      ctx.fillStyle = grad;
+      ctx.shadowColor = '#FF1744';
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 11. TRAIN CONDUCTOR (列车长) - Ranged Control Superhero
+  // ═══════════════════════════════════════════════════════════════
+  train_conductor: {
+    id: 'train_conductor',
+    name: 'Train Conductor',
+    nameCN: '列车长',
+    color: '#1A237E',
+    secondaryColor: '#FFD700',
+    glowColor: 'rgba(26, 35, 126, 0.4)',
+    size: 36,
+    speed: 4.8,
+    hp: 100,
+    attackPower: 15,
+    attackSpeed: 1.0,
+    chargeTime: 0.4,
+    attackRange: 360,
+    projectileSpeed: 850,
+    lifesteal: 0,
+    movePattern: 'keepDistance',
+    aiTendency: 'balanced',
+    weaponType: 'ranged',
+    projectileType: 'train',
+    skill: {
+      name: '列车出站',
+      nameEN: 'Train Stampede',
+      cooldown: 10,
+      damage: 35,
+      range: 250,
+      type: 'train_stampede',
+      duration: 0
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Pocket watch chain dangling
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(-size * 0.3, size * 0.3, size * 0.4, 0, Math.PI * 0.7, false);
+      ctx.stroke();
+
+      // Conductor Hat visor cap
+      ctx.fillStyle = '#0D47A1';
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(size * 0.3, 0, size * 0.6, -Math.PI * 0.5, Math.PI * 0.5, false);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Hat Visor
+      ctx.fillStyle = '#111111';
+      ctx.beginPath();
+      ctx.arc(size * 0.5, 0, size * 0.55, -Math.PI * 0.3, Math.PI * 0.3, false);
+      ctx.lineTo(size * 0.8, size * 0.25);
+      ctx.arc(size * 0.5, 0, size * 0.55, Math.PI * 0.3, -Math.PI * 0.3, true);
+      ctx.closePath();
+      ctx.fill();
+
+      // Gold Badge
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath();
+      ctx.arc(size * 0.4, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 12. SUPERHERO SUMMONER (超级召唤师) - Summoner Superhero
+  // ═══════════════════════════════════════════════════════════════
+  super_summoner: {
+    id: 'super_summoner',
+    name: 'Superhero Summoner',
+    nameCN: '超级召唤师',
+    color: '#9C27B0',
+    secondaryColor: '#E040FB',
+    glowColor: 'rgba(156, 39, 176, 0.4)',
+    size: 34,
+    speed: 3.5,
+    hp: 100,
+    attackPower: 25,
+    attackSpeed: 1.4,
+    chargeTime: 0.2,
+    attackRange: 280,
+    projectileSpeed: 500,
+    lifesteal: 0,
+    movePattern: 'keepDistance',
+    aiTendency: 'defensive',
+    weaponType: 'ranged',
+    projectileType: 'homing_orb',
+    skill: {
+      name: '地狱军团',
+      nameEN: 'Summon Legion',
+      cooldown: 7,
+      damage: 0,
+      range: 1000,
+      type: 'summon_legion',
+      duration: 0
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Wizard Hat
+      ctx.fillStyle = '#4A148C';
+      ctx.strokeStyle = '#E040FB';
+      ctx.lineWidth = 1.5;
+      
+      // Hat brim
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size * 0.9, size * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Hat peak
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.4, 0);
+      ctx.lineTo(size * 0.2, -size * 1.5);
+      ctx.lineTo(size * 0.4, 0);
+      ctx.fill();
+      ctx.stroke();
+
+      // Magic Staff (Held in right hand)
+      ctx.strokeStyle = '#5D4037';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(size * 0.6, -size * 0.8);
+      ctx.lineTo(size * 0.6, size * 0.8);
+      ctx.stroke();
+
+      // Glowing orb on staff
+      ctx.fillStyle = '#00E5FF';
+      ctx.shadowColor = '#00E5FF';
+      ctx.shadowBlur = 10 + Math.sin(time * 5) * 5;
+      ctx.beginPath();
+      ctx.arc(size * 0.6, -size * 0.8, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 13. SUMMONED GOLEM (召唤巨石) - Minion (Hidden)
+  // ═══════════════════════════════════════════════════════════════
+  summoned_golem: {
+    id: 'summoned_golem',
+    name: 'Stone Golem',
+    nameCN: '召唤巨石',
+    color: '#795548',
+    secondaryColor: '#D7CCC8',
+    glowColor: 'rgba(121, 85, 72, 0.4)',
+    size: 28,
+    speed: 4.5,
+    hp: 30,
+    attackPower: 3,
+    attackSpeed: 1.0,
+    chargeTime: 0.4,
+    attackRange: 45,
+    lifesteal: 0,
+    hidden: true, // Not selectable in UI
+    movePattern: 'linear',
+    aiTendency: 'aggressive',
+    weaponType: 'melee',
+    projectileType: null,
+    skill: {
+      name: '巨石重击',
+      nameEN: 'Slam',
+      cooldown: 8,
+      damage: 25,
+      range: 55,
+      type: 'aoe_melee',
+      duration: 0
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Golem rocky shoulders
+      ctx.fillStyle = '#5D4037';
+      ctx.strokeStyle = '#3E2723';
+      ctx.lineWidth = 2;
+      
+      // Left shoulder rock
+      ctx.beginPath();
+      ctx.arc(size * 0.2, -size * 0.8, size * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Right shoulder rock
+      ctx.beginPath();
+      ctx.arc(size * 0.2, size * 0.8, size * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing rune eye
+      ctx.fillStyle = '#E040FB';
+      ctx.shadowColor = '#E040FB';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(size * 0.5, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
 
       ctx.restore();
     }

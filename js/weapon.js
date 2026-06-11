@@ -36,6 +36,7 @@ class Projectile {
     this.lifetime = 2.0;      // Seconds before expiry
     this.rotation = 0;        // Current rotation angle (radians)
     this.hit = false;         // Flag to mark for removal on collision
+    this.hitFighters = [];    // List of fighters hit by this projectile (for piercing)
   }
 
   /**
@@ -46,6 +47,53 @@ class Projectile {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.lifetime -= dt;
+
+    // Homing logic for bat projectile and homing_orb
+    if (this.type === 'bat' || this.type === 'homing_orb') {
+      if (window.combatManager) {
+        var opposingTeam = (this.ownerId === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+        if (opposingTeam) {
+          var target = null;
+          var minDist = Infinity;
+          opposingTeam.forEach(enemy => {
+            if (enemy.isAlive()) {
+              var dx = enemy.x - this.x;
+              var dy = enemy.y - this.y;
+              var d = Math.sqrt(dx * dx + dy * dy);
+              if (d < minDist) {
+                minDist = d;
+                target = enemy;
+              }
+            }
+          });
+
+          if (target) {
+            var tx = target.x - this.x;
+            var ty = target.y - this.y;
+            var tdist = Math.sqrt(tx * tx + ty * ty);
+            if (!isFinite(tx) || !isFinite(ty) || !isFinite(tdist) || tdist < 1) {
+              tx = (this.ownerId === 'left') ? 1 : -1;
+              ty = 0;
+              tdist = 1;
+            }
+            
+            var homingSpeed = this.type === 'homing_orb' ? 550 : 380;
+            var targetVx = (tx / tdist) * homingSpeed;
+            var targetVy = (ty / tdist) * homingSpeed;
+
+            // Interpolate velocity for smooth steering
+            if (isFinite(targetVx) && isFinite(targetVy)) {
+              var turnRate = this.type === 'homing_orb' ? 0.25 : 0.12;
+              this.vx = this.vx * (1 - turnRate) + targetVx * turnRate;
+              this.vy = this.vy * (1 - turnRate) + targetVy * turnRate;
+            }
+          }
+        }
+      }
+      if (this.type === 'bat') {
+        this.rotation = Math.sin(this.lifetime * 25) * 0.4;
+      }
+    }
 
     // Rotation speeds differ by type
     switch (this.type) {
@@ -80,6 +128,7 @@ class Projectile {
       // ───────────────────────────────────────────────
       case 'arrow': {
         var travelAngle = Math.atan2(this.vy, this.vx);
+        if (isNaN(travelAngle) || !isFinite(travelAngle)) travelAngle = 0;
         ctx.translate(this.x, this.y);
         ctx.rotate(travelAngle);
 
@@ -116,9 +165,10 @@ class Projectile {
       }
 
       // ───────────────────────────────────────────────
-      // MAGIC: Glowing circle with outer ring
+      // MAGIC / HOMING ORB: Glowing circle with outer ring
       // ───────────────────────────────────────────────
-      case 'magic': {
+      case 'magic':
+      case 'homing_orb': {
         ctx.translate(this.x, this.y);
         var pulse = 1.0 + Math.sin(this.rotation * 3) * 0.2;
 
@@ -270,6 +320,182 @@ class Projectile {
         ctx.fill();
         break;
       }
+
+      // ───────────────────────────────────────────────
+      // BAT: Homing siphoning bats with flapping wings
+      // ───────────────────────────────────────────────
+      case 'bat': {
+        var travelAngle = Math.atan2(this.vy, this.vx);
+        if (isNaN(travelAngle) || !isFinite(travelAngle)) travelAngle = 0;
+        ctx.translate(this.x, this.y);
+        ctx.rotate(travelAngle);
+
+        var flap = this.rotation; // Oscillation between -0.4 and 0.4 from update()
+
+        // Draw bat wings (dark red / black with bright red trim)
+        ctx.fillStyle = '#1A0008';
+        ctx.strokeStyle = '#FF1744';
+        ctx.lineWidth = 1.2;
+
+        // Left wing (drawn with flap angle)
+        ctx.save();
+        ctx.rotate(-flap);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(-12, -18, -18, -12);
+        ctx.quadraticCurveTo(-10, -6, -4, -2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        // Right wing
+        ctx.save();
+        ctx.rotate(flap);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(-12, 18, -18, 12);
+        ctx.quadraticCurveTo(-10, 6, -4, 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        // Glowing red body core
+        ctx.beginPath();
+        ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#FF1744';
+        ctx.shadowColor = '#FF1744';
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Tiny glowing white eyes
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(1, -2, 1.5, 1);
+        ctx.fillRect(1, 1, 1.5, 1);
+        break;
+      }
+
+      // ───────────────────────────────────────────────
+      // TRAIN: Giant, long steam train locomotive with 2 carriages
+      // ───────────────────────────────────────────────
+      case 'train': {
+        var travelAngle = Math.atan2(this.vy, this.vx);
+        if (isNaN(travelAngle) || !isFinite(travelAngle)) travelAngle = 0;
+        ctx.translate(this.x, this.y);
+        ctx.rotate(travelAngle);
+
+        // Draw steam clouds from chimney (locomotive chimney is around x=10, y=-20)
+        ctx.save();
+        ctx.globalAlpha = 0.35 + Math.sin(this.lifetime * 20) * 0.1;
+        ctx.fillStyle = 'rgba(240, 240, 240, 0.7)';
+        ctx.beginPath();
+        ctx.arc(-2, -32, 11, 0, Math.PI * 2);
+        ctx.arc(-18, -38, 15, 0, Math.PI * 2);
+        ctx.arc(-38, -44, 19, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 1. Couplers (golden bars connecting head and carriages)
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); // between head and carriage 1
+        ctx.lineTo(-34, 0);
+        ctx.moveTo(-64, 0); // between carriage 1 and carriage 2
+        ctx.lineTo(-78, 0);
+        ctx.stroke();
+
+        // 2. Carriage 2 (Rear)
+        ctx.fillStyle = '#1A237E';
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(-108, -15, 30, 30);
+        ctx.fill();
+        ctx.stroke();
+        // Carriage 2 windows (yellow rectangles)
+        ctx.fillStyle = '#FFEB3B';
+        ctx.fillRect(-102, -10, 8, 8);
+        ctx.fillRect(-90, -10, 8, 8);
+        // Carriage 2 wheels
+        ctx.fillStyle = '#111111';
+        ctx.beginPath();
+        ctx.arc(-100, 16, 5, 0, Math.PI * 2);
+        ctx.arc(-86, 16, 5, 0, Math.PI * 2);
+        ctx.arc(-100, -16, 5, 0, Math.PI * 2);
+        ctx.arc(-86, -16, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3. Carriage 1 (Middle)
+        ctx.fillStyle = '#1A237E';
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(-64, -15, 30, 30);
+        ctx.fill();
+        ctx.stroke();
+        // Carriage 1 windows
+        ctx.fillStyle = '#FFEB3B';
+        ctx.fillRect(-58, -10, 8, 8);
+        ctx.fillRect(-46, -10, 8, 8);
+        // Carriage 1 wheels
+        ctx.fillStyle = '#111111';
+        ctx.beginPath();
+        ctx.arc(-56, 16, 5, 0, Math.PI * 2);
+        ctx.arc(-42, 16, 5, 0, Math.PI * 2);
+        ctx.arc(-56, -16, 5, 0, Math.PI * 2);
+        ctx.arc(-42, -16, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 4. Locomotive Head (Front)
+        // Main boiler (navy blue rectangle)
+        ctx.fillStyle = '#0D47A1';
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.rect(-20, -18, 44, 36);
+        ctx.fill();
+        ctx.stroke();
+
+        // Cab roof / visor (curved back cabin)
+        ctx.fillStyle = '#0D47A1';
+        ctx.beginPath();
+        ctx.rect(-20, -24, 18, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        // Cab window (yellow)
+        ctx.fillStyle = '#FFEB3B';
+        ctx.fillRect(-16, -12, 10, 12);
+
+        // Locomotive front grill (gold cowcatcher)
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.moveTo(24, -12);
+        ctx.lineTo(34, 0);
+        ctx.lineTo(24, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        // Chimney
+        ctx.fillStyle = '#1A237E';
+        ctx.beginPath();
+        ctx.rect(10, -26, 8, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        // Locomotive Wheels (larger wheels)
+        ctx.fillStyle = '#111111';
+        ctx.beginPath();
+        ctx.arc(-10, 18, 7, 0, Math.PI * 2);
+        ctx.arc(12, 18, 7, 0, Math.PI * 2);
+        ctx.arc(-10, -18, 7, 0, Math.PI * 2);
+        ctx.arc(12, -18, 7, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
     }
 
     ctx.restore();
@@ -331,6 +557,10 @@ class WeaponSystem {
     var angleToTarget = Math.atan2(dy, dx);
     var angleDiff = angleToTarget - angle;
 
+    if (isNaN(angleDiff) || !isFinite(angleDiff)) {
+      angleDiff = 0;
+    }
+
     // Normalize to [-PI, PI]
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
@@ -354,25 +584,34 @@ class WeaponSystem {
    * @param {string} color - Projectile color
    * @returns {Projectile} The created projectile
    */
-  createRangedAttack(x, y, targetX, targetY, damage, ownerId, type, color) {
+  createRangedAttack(x, y, targetX, targetY, damage, ownerId, type, color, attacker) {
     // Calculate direction to target
     var dx = targetX - x;
     var dy = targetY - y;
     var dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Avoid division by zero
-    if (dist < 1) dist = 1;
+    // Avoid division by zero or non-finite values
+    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
+      dx = (ownerId === 'left') ? 1 : -1;
+      dy = 0;
+      dist = 1;
+    }
 
     var dirX = dx / dist;
     var dirY = dy / dist;
 
-    // Projectile speed varies slightly by type
+    // Projectile speed varies by attacker or defaults
     var speed = 350;
-    if (type === 'arrow') speed = 400;
-    if (type === 'magic') speed = 300;
-    if (type === 'shuriken') speed = 380;
-    if (type === 'banana') speed = 320;
-    if (type === 'skill_projectile') speed = 280;
+    if (attacker && attacker.charData && attacker.charData.projectileSpeed) {
+      speed = attacker.charData.projectileSpeed;
+    } else {
+      if (type === 'arrow') speed = 400;
+      if (type === 'magic') speed = 300;
+      if (type === 'shuriken') speed = 380;
+      if (type === 'banana') speed = 320;
+      if (type === 'train') speed = 300;
+      if (type === 'skill_projectile') speed = 280;
+    }
 
     var vx = dirX * speed;
     var vy = dirY * speed;
@@ -381,14 +620,17 @@ class WeaponSystem {
     var size;
     switch (type) {
       case 'arrow':            size = 5; break;
-      case 'magic':            size = 6; break;
+      case 'magic':
+      case 'homing_orb':       size = 6; break;
       case 'shuriken':         size = 5; break;
       case 'banana':           size = 6; break;
+      case 'train':            size = 24; break;
       case 'skill_projectile': size = 8; break;
       default:                 size = 5; break;
     }
 
     var proj = new Projectile(x, y, vx, vy, damage, ownerId, color, size, type);
+    if (attacker) proj.attacker = attacker;
     this.projectiles.push(proj);
     return proj;
   }
@@ -430,14 +672,26 @@ class WeaponSystem {
         var combinedRadius = proj.size + fighter.charData.size;
 
         if (dist < combinedRadius) {
-          // Hit detected!
-          hits.push({
-            target: fighter,
-            damage: proj.damage,
-            projectile: proj
-          });
-          proj.hit = true; // Mark for removal
-          break; // Each projectile can only hit one target
+          if (proj.type === 'train') {
+            // Train pierces! Only hit each fighter once.
+            if (proj.hitFighters.indexOf(fighter) === -1) {
+              proj.hitFighters.push(fighter);
+              hits.push({
+                target: fighter,
+                damage: proj.damage,
+                projectile: proj
+              });
+            }
+          } else {
+            // Hit detected!
+            hits.push({
+              target: fighter,
+              damage: proj.damage,
+              projectile: proj
+            });
+            proj.hit = true; // Mark for removal
+            break; // Each projectile can only hit one target
+          }
         }
       }
 

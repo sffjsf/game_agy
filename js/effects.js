@@ -106,11 +106,26 @@ class EffectSystem {
    * @param {string} color - Text color (overridden to gold if crit)
    */
   addDamageNumber(x, y, damage, isCrit, color) {
+    // Handle both numeric and string damage values
+    var text;
+    if (typeof damage === 'string') {
+      text = damage;
+    } else if (typeof damage === 'number' && isFinite(damage)) {
+      text = Math.round(damage).toString();
+    } else {
+      text = '0'; // Fallback for NaN/Infinity
+    }
+
+    var displayX = x + (Math.random() - 0.5) * 20;
+    var displayY = y;
+    if (!isFinite(displayX)) displayX = x;
+    if (!isFinite(displayY)) displayY = y;
+
     this.damageNumbers.push({
-      x: x + (Math.random() - 0.5) * 20, // Slight random X offset
-      y: y,
+      x: displayX,
+      y: displayY,
       vy: -70 - Math.random() * 20,       // Float upward
-      text: Math.round(damage).toString(),
+      text: text,
       life: 1.0,
       maxLife: 1.0,
       color: isCrit ? '#FFD700' : (color || '#FF4444'),
@@ -508,6 +523,7 @@ class EffectSystem {
         case 'spark':
           // Elongated rectangle (spark) rotated in direction of movement
           var sparkAngle = Math.atan2(p.vy, p.vx);
+          if (isNaN(sparkAngle) || !isFinite(sparkAngle)) sparkAngle = 0;
           var sparkLen = p.size * 2.5;
           var sparkWidth = p.size * 0.6;
           ctx.translate(p.x, p.y);
