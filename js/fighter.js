@@ -126,6 +126,13 @@ class Fighter {
     let closest = null;
     let minDist = Infinity;
 
+    let currentTargetDist = Infinity;
+    if (this.target && this.target.isAlive()) {
+      const dx = this.target.x - this.x;
+      const dy = this.target.y - this.y;
+      currentTargetDist = Math.sqrt(dx * dx + dy * dy);
+    }
+
     for (let i = 0; i < opposingTeam.length; i++) {
       const enemy = opposingTeam[i];
       if (enemy.isAlive()) {
@@ -139,7 +146,15 @@ class Fighter {
       }
     }
 
-    this.target = closest;
+    // Hysteresis: only switch targets if the new closest is significantly closer
+    // (e.g. 25 pixels) than the current target. This prevents rapid spinning/trembling.
+    if (this.target && this.target.isAlive()) {
+      if (closest !== this.target && minDist < currentTargetDist - 25) {
+        this.target = closest;
+      }
+    } else {
+      this.target = closest;
+    }
   }
 
   /**
@@ -1049,7 +1064,8 @@ class Fighter {
     // Visual feedback
     this.hitFlashTimer = 0.15;
     effectSystem.addHitEffect(this.x, this.y, this.charData.color);
-    effectSystem.addDamageNumber(this.x, this.y - this.charData.size, damage, false, '#FF4444');
+    const damageColor = this.team === 'left' ? '#FF5252' : '#29B6F6';
+    effectSystem.addDamageNumber(this.x, this.y - this.charData.size, damage, false, damageColor);
     
     // Play hit sound
     if (window.soundSystem) window.soundSystem.playHitSound();

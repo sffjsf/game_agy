@@ -129,7 +129,7 @@ class EffectSystem {
       life: 1.0,
       maxLife: 1.0,
       color: isCrit ? '#FFD700' : (color || '#FF4444'),
-      fontSize: isCrit ? 20 : 14,
+      fontSize: isCrit ? 32 : 24,
       isCrit: isCrit
     });
   }
@@ -556,7 +556,7 @@ class EffectSystem {
 
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.font = (d.isCrit ? 'bold ' : '') + d.fontSize + 'px Arial';
+      ctx.font = 'bold ' + d.fontSize + 'px "Arial Black", Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 

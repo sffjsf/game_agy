@@ -102,7 +102,7 @@ class UIManager {
     card.appendChild(stats);
 
     // Hero badge for superheroes
-    const isHero = (charId === 'one_punch_man' || charId === 'blood_demon' || charId === 'train_conductor');
+    const isHero = (charId === 'one_punch_man' || charId === 'blood_demon' || charId === 'train_conductor' || charId == 'super_summoner');
     if (isHero) {
       const badge = document.createElement('div');
       badge.className = 'hero-badge';
@@ -454,7 +454,11 @@ class UIManager {
       let lifestealText = char.lifesteal > 0 ? (char.lifesteal * 100).toFixed(0) + '%' : '无';
       let weaponText = char.weaponType === 'melee' ? '近战' : '远程';
       
+      const isHero = (id === 'one_punch_man' || id === 'blood_demon' || id === 'train_conductor' || id === 'super_summoner');
+      const badgeHtml = isHero ? '<div class="hero-badge" style="top: 8px; left: 8px; font-size: 12px; padding: 4px 8px;">⭐ 英雄</div>' : '';
+
       card.innerHTML = `
+        ${badgeHtml}
         <div class="codex-card-header">
           <div class="codex-icon" style="background-color: ${char.color}; border: 2px solid ${char.secondaryColor};"></div>
           <div class="codex-title">
