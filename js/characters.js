@@ -1076,25 +1076,25 @@ const CHARACTERS = {
     size: 35,
     speed: 3.8,
     hp: 100,
-    attackPower: 13,
-    attackSpeed: 1.35,
+    attackPower: 12,
+    attackSpeed: 1.45,
     chargeTime: 0.45,
-    attackRange: 330,
-    projectileSpeed: 620,
+    attackRange: 560,
+    projectileSpeed: 760,
     lifesteal: 0,
     movePattern: 'wobble',
     aiTendency: 'balanced',
     weaponType: 'ranged',
-    projectileType: 'skill_projectile',
+    projectileType: 'bomb',
     skill: {
       name: '爆裂炸弹',
       nameEN: 'Blast Bomb',
       cooldown: 10,
-      damage: 26,
-      range: 260,
+      damage: 27,
+      range: 520,
       type: 'bomb_toss',
       duration: 0,
-      area: 90
+      area: 125
     },
     drawDecorations: function(ctx, x, y, angle, size, time) {
       ctx.save();
@@ -1151,16 +1151,20 @@ const CHARACTERS = {
     movePattern: 'arc',
     aiTendency: 'cautious',
     weaponType: 'ranged',
-    projectileType: 'magic',
+    projectileType: 'poison',
+    passives: [
+      { id: 'poison_trail', name: '毒雾足迹', description: '移动时在身后留下数秒毒雾，使敌人中毒。' }
+    ],
     skill: {
       name: '毒雾瓶',
       nameEN: 'Toxic Flask',
       cooldown: 9,
-      damage: 14,
+      damage: 10,
       range: 240,
       type: 'poison_cloud',
-      duration: 1.8,
-      area: 100
+      duration: 3.0,
+      area: 110,
+      poisonDps: 4.0
     },
     drawDecorations: function(ctx, x, y, angle, size, time) {
       ctx.save();
@@ -1217,14 +1221,17 @@ const CHARACTERS = {
     aiTendency: 'balanced',
     weaponType: 'melee',
     projectileType: null,
+    passives: [
+      { id: 'spear_pierce', name: '长枪穿刺', description: '普通攻击命中时会穿透直线上的其他敌人，造成较低伤害。' }
+    ],
     skill: {
       name: '突刺',
       nameEN: 'Piercing Thrust',
       cooldown: 8,
-      damage: 20,
-      range: 120,
-      type: 'stun',
-      duration: 0.55
+      damage: 18,
+      range: 155,
+      type: 'pierce',
+      duration: 0
     },
     drawDecorations: function(ctx, x, y, angle, size, time) {
       ctx.save();
@@ -1281,10 +1288,11 @@ const CHARACTERS = {
       name: '冰霜新星',
       nameEN: 'Frost Nova',
       cooldown: 10,
-      damage: 16,
-      range: 230,
-      type: 'slow',
-      duration: 2.0
+      damage: 12,
+      range: 360,
+      type: 'frost_nova',
+      duration: 3.0,
+      area: 360
     },
     drawDecorations: function(ctx, x, y, angle, size, time) {
       ctx.save();

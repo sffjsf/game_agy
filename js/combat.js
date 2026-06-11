@@ -9,6 +9,7 @@ class CombatManager {
 
     this.weaponSystem = new WeaponSystem();
     this.effectSystem = new EffectSystem();
+    this.poisonZones = [];
 
     this.fighter1 = null;
     this.fighter2 = null;
@@ -76,6 +77,7 @@ class CombatManager {
     // Reset systems
     this.weaponSystem.clear();
     this.effectSystem = new EffectSystem();
+    this.poisonZones = [];
 
     // State
     this.state = 'countdown';
@@ -105,6 +107,8 @@ class CombatManager {
         f.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY, this.fightersLeft);
       });
 
+      this.updatePoisonZones(dt);
+
       // Resolve collision between all active fighters
       this.resolveFighterCollision();
 
@@ -116,7 +120,10 @@ class CombatManager {
       if (hits && hits.length > 0) {
         for (const hit of hits) {
           if (hit.target && hit.target.isAlive()) {
-            hit.target.takeDamage(hit.damage, hit.projectile ? hit.projectile.x : hit.target.x, hit.projectile ? hit.projectile.y : hit.target.y, this.effectSystem);
+            const skipDirectDamage = hit.projectile && hit.projectile.type === 'bomb';
+            if (!skipDirectDamage) {
+              hit.target.takeDamage(hit.damage, hit.projectile ? hit.projectile.x : hit.target.x, hit.projectile ? hit.projectile.y : hit.target.y, this.effectSystem);
+            }
             this.processProjectileHitPassives(hit);
           }
         }
@@ -161,12 +168,81 @@ class CombatManager {
       this.effectSystem.addSkillEffect('stun', hit.target.x, hit.target.y, '#FFD700', 30);
     }
 
+    if (projectile.type === 'bomb') {
+      this.applyAreaDamage(projectile.x, projectile.y, projectile.ownerId, hit.damage, 105, attacker);
+      this.effectSystem.addSkillEffect('bomb', projectile.x, projectile.y, projectile.color, 105);
+      this.effectSystem.screenShake(6);
+      return;
+    }
+
+    if (projectile.type === 'poison') {
+      hit.target.applyPoison(3.0, 3.5);
+      hit.target.applySlow(1.2);
+      this.effectSystem.addSkillEffect('poison_cloud', hit.target.x, hit.target.y, projectile.color, 55);
+    }
+
     if (!attacker || !attacker.isAlive()) return;
 
     if (projectile.type === 'bat') {
       attacker.healFromDamage(hit.damage, this.effectSystem, 1.0);
     } else {
       attacker.healFromDamage(hit.damage, this.effectSystem);
+    }
+  }
+
+  applyAreaDamage(x, y, ownerTeam, damage, radius, attacker) {
+    const targets = ownerTeam === 'left' ? this.fightersRight : this.fightersLeft;
+    if (!targets) return;
+
+    targets.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (isFinite(dist) && dist <= radius) {
+        enemy.takeDamage(damage, x, y, this.effectSystem);
+        if (attacker && attacker.isAlive()) {
+          attacker.healFromDamage(damage, this.effectSystem);
+        }
+      }
+    });
+  }
+
+  addPoisonZone(x, y, ownerTeam, radius, duration, poisonDps, slowDuration) {
+    this.poisonZones.push({
+      x: x,
+      y: y,
+      ownerTeam: ownerTeam,
+      radius: radius,
+      duration: duration,
+      maxDuration: duration,
+      poisonDps: poisonDps || 3.0,
+      slowDuration: slowDuration || 0
+    });
+  }
+
+  updatePoisonZones(dt) {
+    for (let i = this.poisonZones.length - 1; i >= 0; i--) {
+      const zone = this.poisonZones[i];
+      zone.duration -= dt;
+      if (zone.duration <= 0) {
+        this.poisonZones.splice(i, 1);
+        continue;
+      }
+
+      const enemies = zone.ownerTeam === 'left' ? this.fightersRight : this.fightersLeft;
+      if (!enemies) continue;
+
+      enemies.forEach(enemy => {
+        if (!enemy.isAlive()) return;
+        const dx = enemy.x - zone.x;
+        const dy = enemy.y - zone.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (isFinite(dist) && dist <= zone.radius) {
+          enemy.applyPoison(Math.min(1.0, zone.duration), zone.poisonDps);
+          if (zone.slowDuration > 0) enemy.applySlow(zone.slowDuration);
+        }
+      });
     }
   }
 
@@ -228,11 +304,6 @@ class CombatManager {
 
     // ── Draw arena background ──
     this._drawArena(ctx);
-
-    // ── Countdown ──
-    if (this.state === 'countdown') {
-      this._drawCountdown(ctx);
-    }
 
     // ── Battle / Finished rendering ──
     if (this.state === 'fighting' || this.state === 'finished') {

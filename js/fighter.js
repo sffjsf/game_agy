@@ -47,6 +47,10 @@ class Fighter {
     // Debuff timers
     this.stunTimer = 0;
     this.slowTimer = 0;
+    this.poisonTimer = 0;
+    this.poisonDps = 0;
+    this.poisonTickTimer = 0;
+    this.poisonTrailTimer = 0;
 
     // Movement pattern state
     this.moveTimer = 0;
@@ -181,6 +185,16 @@ class Fighter {
     this.slowTimer = Math.max(this.slowTimer, duration);
   }
 
+  /**
+   * Apply poison damage over time.
+   * @param {number} duration - Poison duration in seconds
+   * @param {number} dps - Damage per second
+   */
+  applyPoison(duration, dps) {
+    this.poisonTimer = Math.max(this.poisonTimer, duration);
+    this.poisonDps = Math.max(this.poisonDps || 0, dps || 0);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // MAIN UPDATE LOOP
   // ═══════════════════════════════════════════════════════════════
@@ -219,6 +233,8 @@ class Fighter {
     this.skillCooldown = Math.max(0, this.skillCooldown - dt);
     this.stunTimer = Math.max(0, this.stunTimer - dt);
     this.slowTimer = Math.max(0, this.slowTimer - dt);
+    this.updatePoison(dt, effectSystem);
+    this.updatePoisonTrail(dt, effectSystem);
     this.hitFlashTimer = Math.max(0, this.hitFlashTimer - dt);
     this.blinkCooldown = Math.max(0, this.blinkCooldown - dt);
     this.cloneTimer = Math.max(0, this.cloneTimer - dt);
@@ -463,6 +479,8 @@ class Fighter {
     }
     if (!isFinite(this.stunTimer)) this.stunTimer = 0;
     if (!isFinite(this.slowTimer)) this.slowTimer = 0;
+    if (!isFinite(this.poisonTimer)) this.poisonTimer = 0;
+    if (!isFinite(this.poisonDps)) this.poisonDps = 0;
     if (!isFinite(this.attackTimer)) this.attackTimer = 0;
     if (!isFinite(this.skillCooldown)) this.skillCooldown = 0;
 
@@ -536,22 +554,54 @@ class Fighter {
    * @param {EffectSystem} effectSystem
    */
   applyMeleeHitPassives(damage, primaryTarget, effectSystem) {
-    if (!this.hasPassive('saitama_splash')) return;
+    if (this.hasPassive('saitama_splash')) {
+      effectSystem.addSkillEffect('meteor', primaryTarget.x, primaryTarget.y, '#FFD700', 70);
+      effectSystem.screenShake(5);
 
-    effectSystem.addSkillEffect('meteor', primaryTarget.x, primaryTarget.y, '#FFD700', 70);
-    effectSystem.screenShake(5);
+      const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+      if (opposingTeam) {
+        opposingTeam.forEach(enemy => {
+          if (!enemy.isAlive() || enemy === primaryTarget) return;
 
+          const ex = enemy.x - primaryTarget.x;
+          const ey = enemy.y - primaryTarget.y;
+          const edist = Math.sqrt(ex * ex + ey * ey);
+          if (edist <= 70) {
+            enemy.takeDamage(damage * 0.5, this.x, this.y, effectSystem);
+          }
+        });
+      }
+    }
+
+    if (this.hasPassive('spear_pierce')) {
+      this.applyPiercingLineDamage(damage * 0.55, this.charData.attackRange * 1.7, 28, primaryTarget, effectSystem);
+    }
+  }
+
+  /**
+   * Damage enemies in a forward line, excluding the primary target.
+   * @param {number} damage
+   * @param {number} range
+   * @param {number} width
+   * @param {Fighter} primaryTarget
+   * @param {EffectSystem} effectSystem
+   */
+  applyPiercingLineDamage(damage, range, width, primaryTarget, effectSystem) {
     const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
     if (!opposingTeam) return;
 
+    var dirX = Math.cos(this.angle);
+    var dirY = Math.sin(this.angle);
     opposingTeam.forEach(enemy => {
       if (!enemy.isAlive() || enemy === primaryTarget) return;
 
-      const ex = enemy.x - primaryTarget.x;
-      const ey = enemy.y - primaryTarget.y;
-      const edist = Math.sqrt(ex * ex + ey * ey);
-      if (edist <= 70) {
-        enemy.takeDamage(damage * 0.5, this.x, this.y, effectSystem);
+      const ex = enemy.x - this.x;
+      const ey = enemy.y - this.y;
+      const forward = ex * dirX + ey * dirY;
+      const side = Math.abs(ex * dirY - ey * dirX);
+      if (forward >= 0 && forward <= range && side <= width) {
+        enemy.takeDamage(damage, this.x, this.y, effectSystem);
+        effectSystem.addHitEffect(enemy.x, enemy.y, this.charData.color);
       }
     });
   }
@@ -997,6 +1047,46 @@ class Fighter {
   }
 
   /**
+   * Tick poison damage without interrupting movement every frame.
+   * @param {number} dt
+   * @param {EffectSystem} effectSystem
+   */
+  updatePoison(dt, effectSystem) {
+    if (this.poisonTimer <= 0 || this.poisonDps <= 0 || !this.alive) return;
+
+    this.poisonTimer = Math.max(0, this.poisonTimer - dt);
+    this.poisonTickTimer -= dt;
+    if (this.poisonTickTimer <= 0) {
+      this.poisonTickTimer = 0.5;
+      this.takeDamage(this.poisonDps * 0.5, this.x, this.y, effectSystem);
+      effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 12, '中毒', false, '#76FF03');
+      effectSystem.addSkillEffect('poison_cloud', this.x, this.y, '#66BB6A', 28);
+    }
+
+    if (this.poisonTimer <= 0) {
+      this.poisonDps = 0;
+      this.poisonTickTimer = 0;
+    }
+  }
+
+  /**
+   * Poisoner passive: leaves short-lived poison clouds while moving.
+   * @param {number} dt
+   * @param {EffectSystem} effectSystem
+   */
+  updatePoisonTrail(dt, effectSystem) {
+    if (!this.hasPassive('poison_trail') || !this.alive || this.state === 'dead') return;
+    if (!window.combatManager || window.combatManager.state !== 'fighting') return;
+
+    this.poisonTrailTimer = Math.max(0, this.poisonTrailTimer - dt);
+    if (this.poisonTrailTimer > 0) return;
+
+    this.poisonTrailTimer = 0.55;
+    window.combatManager.addPoisonZone(this.x, this.y, this.team, 64, 3.5, 3.0, 0.8);
+    effectSystem.addSkillEffect('poison_cloud', this.x, this.y, '#66BB6A', 58);
+  }
+
+  /**
    * Automatic passives that can trigger without taking or dealing damage.
    * @param {Fighter[]} opposingTeam
    * @param {EffectSystem} effectSystem
@@ -1377,18 +1467,8 @@ class Fighter {
         effectSystem.addSkillEffect('bomb', targetX, targetY, this.charData.color, area);
         effectSystem.screenShake(7);
 
-        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
-        if (opposingTeam) {
-          opposingTeam.forEach(enemy => {
-            if (enemy.isAlive()) {
-              const ex = enemy.x - targetX;
-              const ey = enemy.y - targetY;
-              const edist = Math.sqrt(ex * ex + ey * ey);
-              if (edist <= area) {
-                enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
-              }
-            }
-          });
+        if (window.combatManager) {
+          window.combatManager.applyAreaDamage(targetX, targetY, this.team, skill.damage, area, this);
         }
         break;
       }
@@ -1401,6 +1481,9 @@ class Fighter {
 
         effectSystem.addSkillEffect('poison_cloud', targetX, targetY, this.charData.color, area);
         effectSystem.screenShake(3);
+        if (window.combatManager) {
+          window.combatManager.addPoisonZone(targetX, targetY, this.team, area, skill.duration || 3.0, skill.poisonDps || 4.0, 1.2);
+        }
 
         const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
         if (opposingTeam) {
@@ -1411,8 +1494,58 @@ class Fighter {
               const edist = Math.sqrt(ex * ex + ey * ey);
               if (edist <= area) {
                 enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
-                enemy.applySlow(skill.duration || 1.5);
+                enemy.applyPoison(skill.duration || 3.0, skill.poisonDps || 4.0);
+                enemy.applySlow(1.2);
               }
+            }
+          });
+        }
+        break;
+      }
+
+      // ── PIERCING THRUST (Spearman): Damage enemies in a forward line ──
+      case 'pierce': {
+        const range = skill.range || 150;
+        const width = skill.width || 34;
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+        effectSystem.addSkillEffect('multi_shot', this.x, this.y, this.charData.color, 35);
+
+        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+        if (opposingTeam) {
+          opposingTeam.forEach(enemy => {
+            if (!enemy.isAlive()) return;
+            const ex = enemy.x - this.x;
+            const ey = enemy.y - this.y;
+            const forward = ex * dirX + ey * dirY;
+            const side = Math.abs(ex * dirY - ey * dirX);
+            if (forward >= 0 && forward <= range && side <= width) {
+              enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
+              effectSystem.addHitEffect(enemy.x, enemy.y, this.charData.color);
+            }
+          });
+        }
+        break;
+      }
+
+      // ── FROST NOVA (Frost Apprentice): Large area slow ──
+      case 'frost_nova': {
+        const area = skill.area || 210;
+        effectSystem.addSkillEffect('slow', this.x, this.y, '#4FC3F7', area);
+        effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#B3E5FC', area);
+        effectSystem.screenShake(4);
+
+        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+        if (opposingTeam) {
+          opposingTeam.forEach(enemy => {
+            if (!enemy.isAlive()) return;
+            const ex = enemy.x - this.x;
+            const ey = enemy.y - this.y;
+            const edist = Math.sqrt(ex * ex + ey * ey);
+            if (edist <= area) {
+              enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
+              enemy.applySlow(skill.duration || 3.0);
+              effectSystem.addSkillEffect('slow', enemy.x, enemy.y, '#4FC3F7', 36);
             }
           });
         }
@@ -1682,6 +1815,25 @@ class Fighter {
       ctx.arc(this.x, this.y, this.charData.size + 3, 0, Math.PI * 2);
       ctx.fillStyle = '#42A5F5';
       ctx.fill();
+      ctx.restore();
+    }
+
+    // ── Poison effect (green bubbling ring) ──
+    if (this.poisonTimer > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.35 + Math.sin(time * 8) * 0.1;
+      ctx.strokeStyle = '#76FF03';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.charData.size + 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#76FF03';
+      for (var p = 0; p < 3; p++) {
+        var pa = time * 2 + p * Math.PI * 2 / 3;
+        ctx.beginPath();
+        ctx.arc(this.x + Math.cos(pa) * (this.charData.size + 8), this.y + Math.sin(pa) * (this.charData.size + 8), 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }
 

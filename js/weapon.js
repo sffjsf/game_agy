@@ -109,6 +109,12 @@ class Projectile {
       case 'banana':
         this.rotation += dt * 6;
         break;
+      case 'bomb':
+        this.rotation += dt * 5;
+        break;
+      case 'poison':
+        this.rotation += dt * 4;
+        break;
       case 'skill_projectile':
         this.rotation += dt * 1;
         break;
@@ -201,6 +207,57 @@ class Projectile {
         ctx.beginPath();
         ctx.arc(0, 0, this.size * 0.3, 0, Math.PI * 2);
         ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+        break;
+      }
+
+      // ───────────────────────────────────────────────
+      // POISON: Green bubbling flask orb
+      // ───────────────────────────────────────────────
+      case 'poison': {
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.beginPath();
+        ctx.arc(0, 0, this.size * 1.25, 0, Math.PI * 2);
+        ctx.fillStyle = '#1B5E20';
+        ctx.fill();
+        ctx.strokeStyle = '#76FF03';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#76FF03';
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.arc(-2, -2, this.size * 0.45, 0, Math.PI * 2);
+        ctx.arc(4, 3, this.size * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        break;
+      }
+
+      // ───────────────────────────────────────────────
+      // BOMB: Round bomb with a lit fuse
+      // ───────────────────────────────────────────────
+      case 'bomb': {
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.beginPath();
+        ctx.arc(0, 0, this.size * 1.25, 0, Math.PI * 2);
+        ctx.fillStyle = '#2E1A12';
+        ctx.fill();
+        ctx.strokeStyle = '#FFAB40';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(-this.size * 0.45, -this.size * 0.8);
+        ctx.quadraticCurveTo(-this.size * 0.8, -this.size * 1.2, -this.size * 0.25, -this.size * 1.35);
+        ctx.strokeStyle = '#D7CCC8';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(-this.size * 0.25, -this.size * 1.35, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFD54F';
         ctx.fill();
         break;
       }
@@ -609,6 +666,8 @@ class WeaponSystem {
       if (type === 'magic') speed = 300;
       if (type === 'shuriken') speed = 380;
       if (type === 'banana') speed = 320;
+      if (type === 'bomb') speed = 520;
+      if (type === 'poison') speed = 420;
       if (type === 'train') speed = 300;
       if (type === 'skill_projectile') speed = 280;
     }
@@ -624,6 +683,8 @@ class WeaponSystem {
       case 'homing_orb':       size = 6; break;
       case 'shuriken':         size = 5; break;
       case 'banana':           size = 6; break;
+      case 'bomb':             size = 10; break;
+      case 'poison':           size = 7; break;
       case 'train':            size = 24; break;
       case 'skill_projectile': size = 8; break;
       default:                 size = 5; break;
