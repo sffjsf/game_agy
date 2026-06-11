@@ -265,6 +265,9 @@ const CHARACTERS = {
     aiTendency: 'aggressive',
     weaponType: 'melee',
     projectileType: null,
+    passives: [
+      { id: 'lifesteal', name: '吸血体质', description: '造成伤害时回复 30% 伤害值的生命。' }
+    ],
     skill: {
       name: '暗影冲刺',
       nameEN: 'Shadow Dash',
@@ -537,6 +540,9 @@ const CHARACTERS = {
     aiTendency: 'aggressive',
     weaponType: 'melee',
     projectileType: null,
+    passives: [
+      { id: 'lifesteal', name: '割裂汲取', description: '造成伤害时回复 10% 伤害值的生命。' }
+    ],
     skill: {
       name: '背刺',
       nameEN: 'Backstab',
@@ -642,6 +648,9 @@ const CHARACTERS = {
     aiTendency: 'balanced',
     weaponType: 'ranged',
     projectileType: 'banana',
+    passives: [
+      { id: 'lifesteal', name: '偷吃回复', description: '造成伤害时回复 5% 伤害值的生命。' }
+    ],
     skill: {
       name: '香蕉皮',
       nameEN: 'Banana Peel',
@@ -754,6 +763,10 @@ const CHARACTERS = {
     aiTendency: 'aggressive',
     weaponType: 'melee',
     projectileType: null,
+    passives: [
+      { id: 'saitama_dodge', name: '直觉闪避', description: '受到伤害时有 35% 概率闪避。' },
+      { id: 'saitama_splash', name: '拳风余波', description: '普通攻击命中时造成小范围溅射。' }
+    ],
     skill: {
       name: '认真一拳',
       nameEN: 'Serious Punch',
@@ -829,6 +842,10 @@ const CHARACTERS = {
     aiTendency: 'balanced',
     weaponType: 'melee',
     projectileType: null,
+    passives: [
+      { id: 'lifesteal', name: '鲜血汲取', description: '造成伤害时回复 40% 伤害值的生命。' },
+      { id: 'blood_shield', name: '血红护盾', description: '低生命受击时生成 35 点护盾，15 秒冷却。' }
+    ],
     skill: {
       name: '蝙蝠召唤',
       nameEN: 'Summon Bats',
@@ -913,6 +930,10 @@ const CHARACTERS = {
     aiTendency: 'balanced',
     weaponType: 'ranged',
     projectileType: 'train',
+    passives: [
+      { id: 'steam_whistle', name: '蒸汽鸣笛', description: '敌人靠近时自动击退并减速，6 秒冷却。' },
+      { id: 'train_stun', name: '铁轨震荡', description: '火车投射物命中时额外眩晕。' }
+    ],
     skill: {
       name: '列车出站',
       nameEN: 'Train Stampede',
@@ -986,6 +1007,9 @@ const CHARACTERS = {
     aiTendency: 'defensive',
     weaponType: 'ranged',
     projectileType: 'homing_orb',
+    passives: [
+      { id: 'summoner_attack', name: '石像役使', description: '普通攻击改为召唤一名短命石像。' }
+    ],
     skill: {
       name: '地狱军团',
       nameEN: 'Summon Legion',
@@ -1040,7 +1064,254 @@ const CHARACTERS = {
   },
 
   // ═══════════════════════════════════════════════════════════════
-  // 13. SUMMONED GOLEM (召唤巨石) - Minion (Hidden)
+  // 13. BOMBER (炸弹人) - Ranged Area Damage, Ordinary Fighter
+  // ═══════════════════════════════════════════════════════════════
+  bomber: {
+    id: 'bomber',
+    name: 'Bomber',
+    nameCN: '炸弹人',
+    color: '#FF7043',
+    secondaryColor: '#5D4037',
+    glowColor: 'rgba(255, 112, 67, 0.35)',
+    size: 35,
+    speed: 3.8,
+    hp: 100,
+    attackPower: 13,
+    attackSpeed: 1.35,
+    chargeTime: 0.45,
+    attackRange: 330,
+    projectileSpeed: 620,
+    lifesteal: 0,
+    movePattern: 'wobble',
+    aiTendency: 'balanced',
+    weaponType: 'ranged',
+    projectileType: 'skill_projectile',
+    skill: {
+      name: '爆裂炸弹',
+      nameEN: 'Blast Bomb',
+      cooldown: 10,
+      damage: 26,
+      range: 260,
+      type: 'bomb_toss',
+      duration: 0,
+      area: 90
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Round bomb pack behind the body
+      ctx.beginPath();
+      ctx.arc(-size * 0.75, 0, size * 0.42, 0, Math.PI * 2);
+      ctx.fillStyle = '#2E1A12';
+      ctx.fill();
+      ctx.strokeStyle = '#FFAB40';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Spark fuse
+      var spark = 2 + Math.sin(time * 16) * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.95, -size * 0.28);
+      ctx.quadraticCurveTo(-size * 1.18, -size * 0.62, -size * 1.0, -size * 0.82);
+      ctx.strokeStyle = '#D7CCC8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(-size * 1.0, -size * 0.82, spark, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFD54F';
+      ctx.shadowColor = '#FF6F00';
+      ctx.shadowBlur = 8;
+      ctx.fill();
+
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 14. POISONER (放毒者) - Ranged Debuff, Ordinary Fighter
+  // ═══════════════════════════════════════════════════════════════
+  poisoner: {
+    id: 'poisoner',
+    name: 'Poisoner',
+    nameCN: '放毒者',
+    color: '#66BB6A',
+    secondaryColor: '#1B5E20',
+    glowColor: 'rgba(102, 187, 106, 0.35)',
+    size: 34,
+    speed: 4.0,
+    hp: 100,
+    attackPower: 10,
+    attackSpeed: 1.0,
+    chargeTime: 0.35,
+    attackRange: 310,
+    projectileSpeed: 760,
+    lifesteal: 0,
+    movePattern: 'arc',
+    aiTendency: 'cautious',
+    weaponType: 'ranged',
+    projectileType: 'magic',
+    skill: {
+      name: '毒雾瓶',
+      nameEN: 'Toxic Flask',
+      cooldown: 9,
+      damage: 14,
+      range: 240,
+      type: 'poison_cloud',
+      duration: 1.8,
+      area: 100
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Potion bottle
+      ctx.fillStyle = '#A5D6A7';
+      ctx.strokeStyle = '#1B5E20';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(size * 0.45, -size * 0.45);
+      ctx.lineTo(size * 0.75, -size * 0.25);
+      ctx.lineTo(size * 0.75, size * 0.25);
+      ctx.lineTo(size * 0.45, size * 0.45);
+      ctx.lineTo(size * 0.25, size * 0.2);
+      ctx.lineTo(size * 0.25, -size * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Bubbling poison
+      ctx.fillStyle = '#76FF03';
+      for (var i = 0; i < 3; i++) {
+        var by = -size * 0.3 + i * size * 0.25 + Math.sin(time * 5 + i) * 2;
+        ctx.beginPath();
+        ctx.arc(size * 0.5, by, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 15. SPEARMAN (长枪兵) - Melee Reach, Ordinary Fighter
+  // ═══════════════════════════════════════════════════════════════
+  spearman: {
+    id: 'spearman',
+    name: 'Spearman',
+    nameCN: '长枪兵',
+    color: '#78909C',
+    secondaryColor: '#37474F',
+    glowColor: 'rgba(120, 144, 156, 0.35)',
+    size: 36,
+    speed: 4.7,
+    hp: 100,
+    attackPower: 15,
+    attackSpeed: 1.25,
+    chargeTime: 0.28,
+    attackRange: 105,
+    lifesteal: 0,
+    movePattern: 'linear',
+    aiTendency: 'balanced',
+    weaponType: 'melee',
+    projectileType: null,
+    skill: {
+      name: '突刺',
+      nameEN: 'Piercing Thrust',
+      cooldown: 8,
+      damage: 20,
+      range: 120,
+      type: 'stun',
+      duration: 0.55
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Long spear shaft and tip
+      ctx.strokeStyle = '#8D6E63';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.9, 0);
+      ctx.lineTo(size * 1.9, 0);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(size * 2.15, 0);
+      ctx.lineTo(size * 1.75, -size * 0.16);
+      ctx.lineTo(size * 1.75, size * 0.16);
+      ctx.closePath();
+      ctx.fillStyle = '#CFD8DC';
+      ctx.fill();
+      ctx.strokeStyle = '#607D8B';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 16. FROST APPRENTICE (寒冰学徒) - Ranged Slow, Ordinary Fighter
+  // ═══════════════════════════════════════════════════════════════
+  frost_apprentice: {
+    id: 'frost_apprentice',
+    name: 'Frost Apprentice',
+    nameCN: '寒冰学徒',
+    color: '#4FC3F7',
+    secondaryColor: '#0277BD',
+    glowColor: 'rgba(79, 195, 247, 0.35)',
+    size: 34,
+    speed: 3.9,
+    hp: 100,
+    attackPower: 12,
+    attackSpeed: 1.25,
+    chargeTime: 0.5,
+    attackRange: 350,
+    projectileSpeed: 720,
+    lifesteal: 0,
+    movePattern: 'keepDistance',
+    aiTendency: 'cautious',
+    weaponType: 'ranged',
+    projectileType: 'magic',
+    skill: {
+      name: '冰霜新星',
+      nameEN: 'Frost Nova',
+      cooldown: 10,
+      damage: 16,
+      range: 230,
+      type: 'slow',
+      duration: 2.0
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(time * 1.4);
+
+      // Small rotating snowflake
+      ctx.strokeStyle = '#B3E5FC';
+      ctx.lineWidth = 2;
+      for (var i = 0; i < 6; i++) {
+        ctx.rotate(Math.PI / 3);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(size * 0.72, 0);
+        ctx.moveTo(size * 0.45, 0);
+        ctx.lineTo(size * 0.55, -size * 0.12);
+        ctx.moveTo(size * 0.45, 0);
+        ctx.lineTo(size * 0.55, size * 0.12);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 17. SUMMONED GOLEM (召唤巨石) - Minion (Hidden)
   // ═══════════════════════════════════════════════════════════════
   summoned_golem: {
     id: 'summoned_golem',

@@ -453,6 +453,19 @@ class UIManager {
 
       let lifestealText = char.lifesteal > 0 ? (char.lifesteal * 100).toFixed(0) + '%' : '无';
       let weaponText = char.weaponType === 'melee' ? '近战' : '远程';
+      let passiveHtml = '';
+      if (char.passives && char.passives.length > 0) {
+        passiveHtml = `
+          <div class="codex-passives">
+            <div class="skill-header">
+              <span class="skill-name">被动能力</span>
+            </div>
+            ${char.passives.map(passive => `
+              <p class="skill-desc"><strong>${passive.name}</strong>: ${passive.description}</p>
+            `).join('')}
+          </div>
+        `;
+      }
       
       const isHero = (id === 'one_punch_man' || id === 'blood_demon' || id === 'train_conductor' || id === 'super_summoner');
       const badgeHtml = isHero ? '<div class="hero-badge" style="top: 8px; left: 8px; font-size: 12px; padding: 4px 8px;">⭐ 英雄</div>' : '';
@@ -490,6 +503,7 @@ class UIManager {
             持续时间: ${char.skill.duration}s
           </p>
         </div>
+        ${passiveHtml}
       `;
       codexGrid.appendChild(card);
     });

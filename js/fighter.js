@@ -224,56 +224,8 @@ class Fighter {
     this.cloneTimer = Math.max(0, this.cloneTimer - dt);
     this.skillReady = (this.skillCooldown <= 0);
 
-    // Superhero timers
-    if (this.bloodShieldCooldown > 0) this.bloodShieldCooldown = Math.max(0, this.bloodShieldCooldown - dt);
-    if (this.whistleCooldown > 0) this.whistleCooldown = Math.max(0, this.whistleCooldown - dt);
-
-    // Train Conductor Steam Whistle (Defensive Knockback)
-    if (this.charData.id === 'train_conductor' && (!this.whistleCooldown || this.whistleCooldown <= 0) && this.stunTimer <= 0) {
-      if (opposingTeam) {
-        let triggered = false;
-        opposingTeam.forEach(enemy => {
-          if (enemy.isAlive()) {
-            // Safety check for self and enemy coordinates
-            if (!isFinite(this.x)) this.x = 400;
-            if (!isFinite(this.y)) this.y = 300;
-            if (!isFinite(enemy.x)) enemy.x = 400;
-            if (!isFinite(enemy.y)) enemy.y = 300;
-
-            const dx = enemy.x - this.x;
-            const dy = enemy.y - this.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 100) {
-              triggered = true;
-              
-              // Knock back enemy safely
-              let kbAngle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
-              if (isNaN(kbAngle) || !isFinite(kbAngle)) kbAngle = 0;
-              const kbDist = 80;
-              const nextX = enemy.x + Math.cos(kbAngle) * kbDist;
-              const nextY = enemy.y + Math.sin(kbAngle) * kbDist;
-              
-              if (isFinite(nextX)) enemy.x = nextX;
-              if (isFinite(nextY)) enemy.y = nextY;
-              
-              // Apply slow debuff (50% slow for 2s)
-              enemy.slowTimer = 2.0;
-              effectSystem.addHitEffect(enemy.x, enemy.y, '#FFD700');
-              effectSystem.addDamageNumber(enemy.x, enemy.y - enemy.charData.size, '击退 & 减慢!', false, '#FFD700');
-            }
-          }
-        });
-        
-        if (triggered) {
-          this.whistleCooldown = 6.0;
-          // Whistle golden shockwave and TOOT! text
-          effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#FFD700', 100);
-          effectSystem.screenShake(6);
-          this.showSkillName(effectSystem, '蒸汽鸣笛');
-          effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '鸣笛 TOOT!', false, '#FFD700');
-        }
-      }
-    }
+    this.updatePassiveTimers(dt);
+    this.updateAutomaticPassives(opposingTeam, effectSystem);
 
     // Clear clones when timer expires
     if (this.cloneTimer <= 0 && this.clones.length > 0) {
@@ -550,49 +502,18 @@ class Fighter {
       );
 
       if (result.hit && this.target.isAlive()) {
-        // One Punch Man normal attack explosion:
-        if (this.charData.id === 'one_punch_man') {
-          effectSystem.addSkillEffect('meteor', this.target.x, this.target.y, '#FFD700', 70);
-          effectSystem.screenShake(5);
-          
-          const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
-          if (opposingTeam) {
-            opposingTeam.forEach(enemy => {
-              if (enemy.isAlive() && enemy !== this.target) {
-                const ex = enemy.x - this.target.x;
-                const ey = enemy.y - this.target.y;
-                const edist = Math.sqrt(ex * ex + ey * ey);
-                if (edist <= 70) {
-                  enemy.takeDamage(result.damage * 0.5, this.x, this.y, effectSystem);
-                }
-              }
-            });
-          }
-        }
-
+        this.applyMeleeHitPassives(result.damage, this.target, effectSystem);
         this.target.takeDamage(result.damage, this.x, this.y, effectSystem);
-
-        // Lifesteal
-        if (this.charData.lifesteal > 0) {
-          this.heal(result.damage * this.charData.lifesteal, effectSystem);
-        }
+        this.healFromDamage(result.damage, effectSystem);
 
         effectSystem.addHitEffect(this.target.x, this.target.y, this.charData.color);
         effectSystem.screenShake(3);
       }
       if (window.soundSystem) window.soundSystem.playSwingSound();
     } else {
-      // Ranged: spawn projectile or summon (for super_summoner)
-      if (this.charData.id === 'super_summoner') {
-        const teamArr = this.team === 'left' ? window.combatManager.fightersLeft : window.combatManager.fightersRight;
-        if (teamArr) {
-          var spawnX = this.x + (Math.random() - 0.5) * 60;
-          var spawnY = this.y + (Math.random() - 0.5) * 60;
-          var minion = new Fighter('summoned_golem', spawnX, spawnY, this.team);
-          teamArr.push(minion);
-          effectSystem.addSkillEffect('clone', spawnX, spawnY, '#E040FB', 30);
-          if (window.soundSystem) window.soundSystem.playSummonSound();
-        }
+      // Ranged: spawn projectile or use a special ranged passive.
+      if (this.hasPassive('summoner_attack')) {
+        this.performSummonerBasicAttack(effectSystem);
       } else {
         weaponSystem.createRangedAttack(
           this.x, this.y,
@@ -606,6 +527,49 @@ class Fighter {
         if (window.soundSystem) window.soundSystem.playShootSound();
       }
     }
+  }
+
+  /**
+   * Passive effects that happen when this fighter lands a melee hit.
+   * @param {number} damage
+   * @param {Fighter} primaryTarget
+   * @param {EffectSystem} effectSystem
+   */
+  applyMeleeHitPassives(damage, primaryTarget, effectSystem) {
+    if (!this.hasPassive('saitama_splash')) return;
+
+    effectSystem.addSkillEffect('meteor', primaryTarget.x, primaryTarget.y, '#FFD700', 70);
+    effectSystem.screenShake(5);
+
+    const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+    if (!opposingTeam) return;
+
+    opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive() || enemy === primaryTarget) return;
+
+      const ex = enemy.x - primaryTarget.x;
+      const ey = enemy.y - primaryTarget.y;
+      const edist = Math.sqrt(ex * ex + ey * ey);
+      if (edist <= 70) {
+        enemy.takeDamage(damage * 0.5, this.x, this.y, effectSystem);
+      }
+    });
+  }
+
+  /**
+   * Super Summoner passive: basic attacks summon a golem instead of firing.
+   * @param {EffectSystem} effectSystem
+   */
+  performSummonerBasicAttack(effectSystem) {
+    const teamArr = this.team === 'left' ? window.combatManager.fightersLeft : window.combatManager.fightersRight;
+    if (!teamArr) return;
+
+    var spawnX = this.x + (Math.random() - 0.5) * 60;
+    var spawnY = this.y + (Math.random() - 0.5) * 60;
+    var minion = new Fighter('summoned_golem', spawnX, spawnY, this.team);
+    teamArr.push(minion);
+    effectSystem.addSkillEffect('clone', spawnX, spawnY, '#E040FB', 30);
+    if (window.soundSystem) window.soundSystem.playSummonSound();
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1014,6 +978,80 @@ class Fighter {
     effectSystem.addSkillName(this.x, this.y - this.charData.size - 34, skillName, this.team);
   }
 
+  /**
+   * Whether this fighter declares a passive by id in character data.
+   * @param {string} passiveId
+   * @returns {boolean}
+   */
+  hasPassive(passiveId) {
+    return !!(this.charData.passives && this.charData.passives.some(passive => passive.id === passiveId));
+  }
+
+  /**
+   * Passive-specific cooldowns and timers.
+   * @param {number} dt
+   */
+  updatePassiveTimers(dt) {
+    if (this.bloodShieldCooldown > 0) this.bloodShieldCooldown = Math.max(0, this.bloodShieldCooldown - dt);
+    if (this.whistleCooldown > 0) this.whistleCooldown = Math.max(0, this.whistleCooldown - dt);
+  }
+
+  /**
+   * Automatic passives that can trigger without taking or dealing damage.
+   * @param {Fighter[]} opposingTeam
+   * @param {EffectSystem} effectSystem
+   */
+  updateAutomaticPassives(opposingTeam, effectSystem) {
+    if (this.hasPassive('steam_whistle')) {
+      this.trySteamWhistle(opposingTeam, effectSystem);
+    }
+  }
+
+  /**
+   * Train Conductor passive: knock back and slow nearby enemies.
+   * @param {Fighter[]} opposingTeam
+   * @param {EffectSystem} effectSystem
+   */
+  trySteamWhistle(opposingTeam, effectSystem) {
+    if (!opposingTeam || this.stunTimer > 0 || this.whistleCooldown > 0) return;
+
+    var triggered = false;
+    opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+
+      if (!isFinite(this.x)) this.x = 400;
+      if (!isFinite(this.y)) this.y = 300;
+      if (!isFinite(enemy.x)) enemy.x = 400;
+      if (!isFinite(enemy.y)) enemy.y = 300;
+
+      var dx = enemy.x - this.x;
+      var dy = enemy.y - this.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist >= 100) return;
+
+      triggered = true;
+      var kbAngle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+      if (isNaN(kbAngle) || !isFinite(kbAngle)) kbAngle = 0;
+
+      var nextX = enemy.x + Math.cos(kbAngle) * 80;
+      var nextY = enemy.y + Math.sin(kbAngle) * 80;
+      if (isFinite(nextX)) enemy.x = nextX;
+      if (isFinite(nextY)) enemy.y = nextY;
+
+      enemy.applySlow(2.0);
+      effectSystem.addHitEffect(enemy.x, enemy.y, '#FFD700');
+      effectSystem.addDamageNumber(enemy.x, enemy.y - enemy.charData.size, '击退 & 减慢!', false, '#FFD700');
+    });
+
+    if (!triggered) return;
+
+    this.whistleCooldown = 6.0;
+    effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#FFD700', 100);
+    effectSystem.screenShake(6);
+    this.showSkillName(effectSystem, '蒸汽鸣笛');
+    effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '鸣笛 TOOT!', false, '#FFD700');
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // DAMAGE & HEALING
   // ═══════════════════════════════════════════════════════════════
@@ -1044,37 +1082,8 @@ class Fighter {
       attackerY = this.y;
     }
 
-    // Saitama Passive Dodge:
-    if (this.charData.id === 'one_punch_man' && Math.random() < 0.35) {
-      effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '闪避!', false, '#FFFFFF');
-      effectSystem.addHitEffect(this.x, this.y, '#FFFFFF');
-      return;
-    }
-
-    // Blood Demon Shield Trigger:
-    if (this.charData.id === 'blood_demon') {
-      // If shield is active, absorb damage
-      if (this.bloodShield && this.bloodShield > 0) {
-        if (damage >= this.bloodShield) {
-          damage -= this.bloodShield;
-          this.bloodShield = 0;
-          effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '护盾破碎!', false, '#FF1744');
-        } else {
-          this.bloodShield -= damage;
-          effectSystem.addDamageNumber(this.x, this.y - this.charData.size, `吸收 ${Math.floor(damage)}`, false, '#FF5252');
-          damage = 0;
-        }
-      }
-
-      // If HP drops below 45% and shield is off cooldown, trigger it
-      if (damage > 0 && this.hp - damage < 45 && (!this.bloodShieldCooldown || this.bloodShieldCooldown <= 0)) {
-        this.bloodShield = 35;
-        this.bloodShieldCooldown = 15.0; // 15s cooldown
-        effectSystem.addHealEffect(this.x, this.y);
-        effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '+血红护盾!', false, '#FF1744');
-        effectSystem.addSkillEffect('clone', this.x, this.y, '#FF1744', 40);
-      }
-    }
+    if (this.tryDamageAvoidancePassives(effectSystem)) return;
+    damage = this.applyDamageReductionPassives(damage, effectSystem);
 
     if (damage <= 0) return;
 
@@ -1135,6 +1144,64 @@ class Fighter {
   }
 
   /**
+   * Passive effects that fully avoid incoming damage.
+   * @param {EffectSystem} effectSystem
+   * @returns {boolean} True when damage should be cancelled
+   */
+  tryDamageAvoidancePassives(effectSystem) {
+    if (!this.hasPassive('saitama_dodge')) return false;
+    if (Math.random() >= 0.35) return false;
+
+    effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '闪避!', false, '#FFFFFF');
+    effectSystem.addHitEffect(this.x, this.y, '#FFFFFF');
+    return true;
+  }
+
+  /**
+   * Passive shields and damage reducers.
+   * @param {number} damage
+   * @param {EffectSystem} effectSystem
+   * @returns {number} Remaining damage
+   */
+  applyDamageReductionPassives(damage, effectSystem) {
+    if (!this.hasPassive('blood_shield')) return damage;
+
+    if (this.bloodShield > 0) {
+      if (damage >= this.bloodShield) {
+        damage -= this.bloodShield;
+        this.bloodShield = 0;
+        effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '护盾破碎!', false, '#FF1744');
+      } else {
+        this.bloodShield -= damage;
+        effectSystem.addDamageNumber(this.x, this.y - this.charData.size, `吸收 ${Math.floor(damage)}`, false, '#FF5252');
+        damage = 0;
+      }
+    }
+
+    if (damage > 0 && this.hp - damage < 45 && this.bloodShieldCooldown <= 0) {
+      this.bloodShield = 35;
+      this.bloodShieldCooldown = 15.0;
+      effectSystem.addHealEffect(this.x, this.y);
+      effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '+血红护盾!', false, '#FF1744');
+      effectSystem.addSkillEffect('clone', this.x, this.y, '#FF1744', 40);
+    }
+
+    return damage;
+  }
+
+  /**
+   * Heal from damage dealt when the character has lifesteal.
+   * @param {number} damage
+   * @param {EffectSystem} effectSystem
+   * @param {number=} overrideRatio
+   */
+  healFromDamage(damage, effectSystem, overrideRatio) {
+    var ratio = typeof overrideRatio === 'number' ? overrideRatio : (this.charData.lifesteal || 0);
+    if (ratio <= 0 || damage <= 0) return;
+    this.heal(damage * ratio, effectSystem);
+  }
+
+  /**
    * Execute the hit/payload of a dashing skill after completing the smooth dash movement.
    * @param {EffectSystem} effectSystem
    * @param {number} arenaWidth
@@ -1162,9 +1229,7 @@ class Fighter {
       // Vampire dash damage & heal
       if (dist <= 45) {
         this.target.takeDamage(skill.damage, this.x, this.y, effectSystem);
-        if (this.charData.lifesteal > 0) {
-          this.heal(skill.damage * this.charData.lifesteal, effectSystem);
-        }
+        this.healFromDamage(skill.damage, effectSystem);
       }
       effectSystem.screenShake(5);
     } else if (this.dashSkillType === 'backstab') {
@@ -1246,9 +1311,7 @@ class Fighter {
               const edist = Math.sqrt(ex * ex + ey * ey);
               if (edist <= skill.range) {
                 enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
-                if (this.charData.lifesteal > 0) {
-                  this.heal(skill.damage * this.charData.lifesteal, effectSystem);
-                }
+                this.healFromDamage(skill.damage, effectSystem);
               }
             }
           });
@@ -1298,6 +1361,57 @@ class Fighter {
               const edist = Math.sqrt(ex * ex + ey * ey);
               if (edist <= area) {
                 enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
+              }
+            }
+          });
+        }
+        break;
+      }
+
+      // ── BLAST BOMB (Bomber): Moderate area damage at target location ──
+      case 'bomb_toss': {
+        const area = skill.area || 90;
+        const targetX = this.target.x;
+        const targetY = this.target.y;
+
+        effectSystem.addSkillEffect('bomb', targetX, targetY, this.charData.color, area);
+        effectSystem.screenShake(7);
+
+        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+        if (opposingTeam) {
+          opposingTeam.forEach(enemy => {
+            if (enemy.isAlive()) {
+              const ex = enemy.x - targetX;
+              const ey = enemy.y - targetY;
+              const edist = Math.sqrt(ex * ex + ey * ey);
+              if (edist <= area) {
+                enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
+              }
+            }
+          });
+        }
+        break;
+      }
+
+      // ── TOXIC FLASK (Poisoner): Light area damage plus slow ──
+      case 'poison_cloud': {
+        const area = skill.area || 100;
+        const targetX = this.target.x;
+        const targetY = this.target.y;
+
+        effectSystem.addSkillEffect('poison_cloud', targetX, targetY, this.charData.color, area);
+        effectSystem.screenShake(3);
+
+        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+        if (opposingTeam) {
+          opposingTeam.forEach(enemy => {
+            if (enemy.isAlive()) {
+              const ex = enemy.x - targetX;
+              const ey = enemy.y - targetY;
+              const edist = Math.sqrt(ex * ex + ey * ey);
+              if (edist <= area) {
+                enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
+                enemy.applySlow(skill.duration || 1.5);
               }
             }
           });
@@ -1536,7 +1650,7 @@ class Fighter {
     ctx.stroke();
 
     // Render Blood Shield Bubble
-    if (this.charData.id === 'blood_demon' && this.bloodShield > 0) {
+    if (this.bloodShield > 0) {
       ctx.save();
       ctx.strokeStyle = 'rgba(255, 23, 68, 0.85)';
       ctx.lineWidth = 3;

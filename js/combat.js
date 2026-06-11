@@ -117,33 +117,7 @@ class CombatManager {
         for (const hit of hits) {
           if (hit.target && hit.target.isAlive()) {
             hit.target.takeDamage(hit.damage, hit.projectile ? hit.projectile.x : hit.target.x, hit.projectile ? hit.projectile.y : hit.target.y, this.effectSystem);
-
-            // Handle special train projectile stun
-            if (hit.projectile && hit.projectile.type === 'train') {
-              hit.target.applyStun(1.8);
-              this.effectSystem.addSkillEffect('stun', hit.target.x, hit.target.y, '#FFD700', 30);
-            }
-
-            // Handle special bat projectile lifesteal (100% siphon)
-            if (hit.projectile && hit.projectile.type === 'bat') {
-              const attacker = hit.projectile.attacker;
-              if (attacker && attacker.isAlive()) {
-                attacker.heal(hit.damage * 1.0, this.effectSystem);
-              }
-            }
-
-            // Lifesteal – heal attacker
-            const attacker = hit.projectile ? hit.projectile.attacker : null;
-            if (attacker && attacker.isAlive() && attacker.charData.lifesteal && attacker.charData.lifesteal > 0) {
-              if (hit.projectile && hit.projectile.type === 'bat') {
-                // Already siphoned 100%
-              } else {
-                const healAmt = hit.damage * attacker.charData.lifesteal;
-                if (healAmt > 0) {
-                  attacker.heal(healAmt, this.effectSystem);
-                }
-              }
-            }
+            this.processProjectileHitPassives(hit);
           }
         }
       }
@@ -173,6 +147,26 @@ class CombatManager {
     if (this.state === 'finished') {
       // Let remaining effects play out
       this.effectSystem.update(dt);
+    }
+  }
+
+  processProjectileHitPassives(hit) {
+    if (!hit.projectile) return;
+
+    const projectile = hit.projectile;
+    const attacker = projectile.attacker;
+
+    if (attacker && attacker.hasPassive && attacker.hasPassive('train_stun') && projectile.type === 'train') {
+      hit.target.applyStun(1.8);
+      this.effectSystem.addSkillEffect('stun', hit.target.x, hit.target.y, '#FFD700', 30);
+    }
+
+    if (!attacker || !attacker.isAlive()) return;
+
+    if (projectile.type === 'bat') {
+      attacker.healFromDamage(hit.damage, this.effectSystem, 1.0);
+    } else {
+      attacker.healFromDamage(hit.damage, this.effectSystem);
     }
   }
 

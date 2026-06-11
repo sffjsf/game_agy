@@ -286,6 +286,62 @@ class EffectSystem {
         }
         break;
 
+      case 'bomb':
+        // Compact fiery explosion for ordinary bomber skills
+        this.particles.push({
+          x: x, y: y, vx: 0, vy: 0,
+          life: 0.45, maxLife: 0.45,
+          color: '#FF7043', size: radius,
+          gravity: 0, friction: 1.0,
+          type: 'ring'
+        });
+        for (var i = 0; i < 24; i++) {
+          var angle = Math.random() * Math.PI * 2;
+          var speed = 80 + Math.random() * 170;
+          this.particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.35 + Math.random() * 0.25,
+            maxLife: 0.6,
+            color: i % 3 === 0 ? '#FFCA28' : (i % 3 === 1 ? '#FF7043' : '#6D4C41'),
+            size: 3 + Math.random() * 5,
+            gravity: 80,
+            friction: 0.9,
+            type: 'spark'
+          });
+        }
+        break;
+
+      case 'poison_cloud':
+        // Lingering green cloud dots spreading around the target
+        this.particles.push({
+          x: x, y: y, vx: 0, vy: 0,
+          life: 0.8, maxLife: 0.8,
+          color: '#66BB6A', size: radius,
+          gravity: 0, friction: 1.0,
+          type: 'ring'
+        });
+        for (var i = 0; i < 28; i++) {
+          var angle = Math.random() * Math.PI * 2;
+          var dist = Math.random() * radius * 0.55;
+          this.particles.push({
+            x: x + Math.cos(angle) * dist,
+            y: y + Math.sin(angle) * dist * 0.55,
+            vx: (Math.random() - 0.5) * 45,
+            vy: -20 - Math.random() * 35,
+            life: 0.7 + Math.random() * 0.45,
+            maxLife: 1.15,
+            color: i % 2 === 0 ? '#76FF03' : '#2E7D32',
+            size: 5 + Math.random() * 7,
+            gravity: -10,
+            friction: 0.94,
+            type: 'circle'
+          });
+        }
+        break;
+
       case 'dash':
         // Trail of particles along a line
         for (var i = 0; i < 20; i++) {
