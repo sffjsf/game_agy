@@ -51,6 +51,9 @@ class Fighter {
     this.poisonDps = 0;
     this.poisonTickTimer = 0;
     this.poisonTrailTimer = 0;
+    this.burnTimer = 0;
+    this.burnDps = 0;
+    this.burnTickTimer = 0;
 
     // Movement pattern state
     this.moveTimer = 0;
@@ -91,6 +94,7 @@ class Fighter {
     this.bloodShield = 0;
     this.bloodShieldCooldown = 0;
     this.whistleCooldown = 0;
+    this.rebirthUsed = false;
 
     // Reference to enemy target (set externally)
     this.target = null;
@@ -195,6 +199,16 @@ class Fighter {
     this.poisonDps = Math.max(this.poisonDps || 0, dps || 0);
   }
 
+  /**
+   * Apply burn damage over time.
+   * @param {number} duration - Burn duration in seconds
+   * @param {number} dps - Damage per second
+   */
+  applyBurn(duration, dps) {
+    this.burnTimer = Math.max(this.burnTimer, duration);
+    this.burnDps = Math.max(this.burnDps || 0, dps || 0);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // MAIN UPDATE LOOP
   // ═══════════════════════════════════════════════════════════════
@@ -234,6 +248,7 @@ class Fighter {
     this.stunTimer = Math.max(0, this.stunTimer - dt);
     this.slowTimer = Math.max(0, this.slowTimer - dt);
     this.updatePoison(dt, effectSystem);
+    this.updateBurn(dt, effectSystem);
     this.updatePoisonTrail(dt, effectSystem);
     this.hitFlashTimer = Math.max(0, this.hitFlashTimer - dt);
     this.blinkCooldown = Math.max(0, this.blinkCooldown - dt);
@@ -481,6 +496,8 @@ class Fighter {
     if (!isFinite(this.slowTimer)) this.slowTimer = 0;
     if (!isFinite(this.poisonTimer)) this.poisonTimer = 0;
     if (!isFinite(this.poisonDps)) this.poisonDps = 0;
+    if (!isFinite(this.burnTimer)) this.burnTimer = 0;
+    if (!isFinite(this.burnDps)) this.burnDps = 0;
     if (!isFinite(this.attackTimer)) this.attackTimer = 0;
     if (!isFinite(this.skillCooldown)) this.skillCooldown = 0;
 
@@ -501,6 +518,12 @@ class Fighter {
     if (!this.target || !this.target.isAlive()) return;
 
     if (this.charData.weaponType === 'melee') {
+      if (this.hasPassive('fire_cone_basic')) {
+        this.executeFireConeAttack(effectSystem);
+        if (window.soundSystem) window.soundSystem.playSwingSound();
+        return;
+      }
+
       // Give a slight lunge slide forward (20px) towards target on attack trigger
       var dx = this.target.x - this.x;
       var dy = this.target.y - this.y;
@@ -620,6 +643,44 @@ class Fighter {
     teamArr.push(minion);
     effectSystem.addSkillEffect('clone', spawnX, spawnY, '#E040FB', 30);
     if (window.soundSystem) window.soundSystem.playSummonSound();
+  }
+
+  /**
+   * Vulcan basic attack: cone fire that burns all enemies in front.
+   * @param {EffectSystem} effectSystem
+   */
+  executeFireConeAttack(effectSystem) {
+    if (!window.combatManager) return;
+
+    const range = this.charData.attackRange || 190;
+    const coneHalfAngle = Math.PI / 4;
+    const opposingTeam = this.team === 'left' ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+    if (!opposingTeam) return;
+
+    if (effectSystem.addFireCone) {
+      effectSystem.addFireCone(this.x, this.y, this.angle, '#FF5722', range);
+    } else {
+      effectSystem.addSkillEffect('fire_cone', this.x, this.y, '#FF5722', range);
+    }
+    effectSystem.screenShake(3);
+
+    opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+
+      const dx = enemy.x - this.x;
+      const dy = enemy.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (!isFinite(dist) || dist > range) return;
+
+      var angleDiff = Math.atan2(dy, dx) - this.angle;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      if (Math.abs(angleDiff) <= coneHalfAngle) {
+        enemy.takeDamage(this.charData.attackPower, this.x, this.y, effectSystem);
+        enemy.applyBurn(4.0, 6.0);
+        effectSystem.addHitEffect(enemy.x, enemy.y, '#FFAB00');
+      }
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1070,6 +1131,29 @@ class Fighter {
   }
 
   /**
+   * Tick burn damage over time.
+   * @param {number} dt
+   * @param {EffectSystem} effectSystem
+   */
+  updateBurn(dt, effectSystem) {
+    if (this.burnTimer <= 0 || this.burnDps <= 0 || !this.alive) return;
+
+    this.burnTimer = Math.max(0, this.burnTimer - dt);
+    this.burnTickTimer -= dt;
+    if (this.burnTickTimer <= 0) {
+      this.burnTickTimer = 0.5;
+      this.takeDamage(this.burnDps * 0.5, this.x, this.y, effectSystem);
+      effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 16, '着火', false, '#FFAB00');
+      effectSystem.addSkillEffect('fire_burst', this.x, this.y, '#FF5722', 24);
+    }
+
+    if (this.burnTimer <= 0) {
+      this.burnDps = 0;
+      this.burnTickTimer = 0;
+    }
+  }
+
+  /**
    * Poisoner passive: leaves short-lived poison clouds while moving.
    * @param {number} dt
    * @param {EffectSystem} effectSystem
@@ -1081,9 +1165,9 @@ class Fighter {
     this.poisonTrailTimer = Math.max(0, this.poisonTrailTimer - dt);
     if (this.poisonTrailTimer > 0) return;
 
-    this.poisonTrailTimer = 0.55;
-    window.combatManager.addPoisonZone(this.x, this.y, this.team, 64, 3.5, 3.0, 0.8);
-    effectSystem.addSkillEffect('poison_cloud', this.x, this.y, '#66BB6A', 58);
+    this.poisonTrailTimer = 0.85;
+    window.combatManager.addPoisonZone(this.x, this.y, this.team, 56, 3.2, 3.0, 0.8);
+    effectSystem.addSkillEffect('poison_cloud', this.x, this.y, '#66BB6A', 42);
   }
 
   /**
@@ -1210,8 +1294,12 @@ class Fighter {
 
     // State transition
     if (this.hp <= 0) {
-      if (window.soundSystem) window.soundSystem.playDeathSound();
-      this.setState('dead');
+      if (this.tryLethalSurvivalPassives(effectSystem)) {
+        this.setState('chase');
+      } else {
+        if (window.soundSystem) window.soundSystem.playDeathSound();
+        this.setState('dead');
+      }
     } else if (this.state !== 'attack' && this.state !== 'skill' && this.state !== 'reposition' && this.state !== 'dashing_skill' && this.state !== 'dead') {
       this.setState('hit');
     }
@@ -1277,6 +1365,38 @@ class Fighter {
     }
 
     return damage;
+  }
+
+  /**
+   * Strong hero passive: survive lethal damage once and ignite nearby enemies.
+   * @param {EffectSystem} effectSystem
+   * @returns {boolean} True when lethal damage was cancelled
+   */
+  tryLethalSurvivalPassives(effectSystem) {
+    if (!this.hasPassive('inferno_rebirth') || this.rebirthUsed || this.hp > 0) return false;
+
+    this.rebirthUsed = true;
+    this.hp = Math.min(this.maxHp, 45);
+    this.burnTimer = 0;
+    this.burnDps = 0;
+    effectSystem.addSkillEffect('fire_burst', this.x, this.y, '#FF5722', 150);
+    effectSystem.screenShake(14);
+    effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 18, '浴火重生!', false, '#FFD54F');
+
+    const opposingTeam = this.team === 'left' ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+    if (opposingTeam) {
+      opposingTeam.forEach(enemy => {
+        if (!enemy.isAlive()) return;
+        const dx = enemy.x - this.x;
+        const dy = enemy.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (isFinite(dist) && dist <= 150) {
+          enemy.takeDamage(18, this.x, this.y, effectSystem);
+          enemy.applyBurn(4.0, 6.0);
+        }
+      });
+    }
+    return true;
   }
 
   /**
@@ -1549,6 +1669,36 @@ class Fighter {
             }
           });
         }
+        break;
+      }
+
+      // ── INFERNO DETONATION (Vulcan): Explode all burning enemies ──
+      case 'inferno_detonation': {
+        const area = skill.area || 115;
+        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+        if (opposingTeam) {
+          var burningTargets = opposingTeam.filter(enemy => enemy.isAlive() && enemy.burnTimer > 0);
+          if (burningTargets.length === 0 && this.target && this.target.isAlive()) {
+            this.target.applyBurn(skill.burnDuration || 3.5, skill.burnDps || 6);
+            burningTargets = [this.target];
+          }
+
+          burningTargets.forEach(burningEnemy => {
+            effectSystem.addSkillEffect('fire_burst', burningEnemy.x, burningEnemy.y, '#FF5722', area);
+            window.combatManager.applyAreaDamage(burningEnemy.x, burningEnemy.y, this.team, skill.damage, area, this);
+
+            opposingTeam.forEach(enemy => {
+              if (!enemy.isAlive()) return;
+              const ex = enemy.x - burningEnemy.x;
+              const ey = enemy.y - burningEnemy.y;
+              const edist = Math.sqrt(ex * ex + ey * ey);
+              if (isFinite(edist) && edist <= area) {
+                enemy.applyBurn(skill.burnDuration || 3.5, skill.burnDps || 6);
+              }
+            });
+          });
+        }
+        effectSystem.screenShake(12);
         break;
       }
 
@@ -1832,6 +1982,25 @@ class Fighter {
         var pa = time * 2 + p * Math.PI * 2 / 3;
         ctx.beginPath();
         ctx.arc(this.x + Math.cos(pa) * (this.charData.size + 8), this.y + Math.sin(pa) * (this.charData.size + 8), 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // ── Burn effect (orange flame ring) ──
+    if (this.burnTimer > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.45 + Math.sin(time * 10) * 0.12;
+      ctx.strokeStyle = '#FFAB00';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.charData.size + 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#FF5722';
+      for (var b = 0; b < 4; b++) {
+        var ba = -time * 3 + b * Math.PI * 2 / 4;
+        ctx.beginPath();
+        ctx.arc(this.x + Math.cos(ba) * (this.charData.size + 9), this.y + Math.sin(ba) * (this.charData.size + 9), 3, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();

@@ -164,6 +164,36 @@ class EffectSystem {
     });
   }
 
+  /**
+   * Directional cone of fire particles.
+   * @param {number} x
+   * @param {number} y
+   * @param {number} angle
+   * @param {string} color
+   * @param {number} range
+   */
+  addFireCone(x, y, angle, color, range) {
+    var baseColor = color || '#FF5722';
+    for (var i = 0; i < 34; i++) {
+      var spread = angle + (Math.random() - 0.5) * Math.PI * 0.8;
+      var speed = 130 + Math.random() * 210;
+      var offset = Math.random() * 16;
+      this.particles.push({
+        x: x + Math.cos(spread) * offset,
+        y: y + Math.sin(spread) * offset,
+        vx: Math.cos(spread) * speed,
+        vy: Math.sin(spread) * speed,
+        life: 0.25 + Math.random() * 0.25,
+        maxLife: 0.5,
+        color: i % 3 === 0 ? '#FFD54F' : (i % 3 === 1 ? baseColor : '#D84315'),
+        size: 3 + Math.random() * 5,
+        gravity: -15,
+        friction: 0.92,
+        type: 'spark'
+      });
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // CHARGE EFFECT - Particles converging inward (charging up)
   // ═══════════════════════════════════════════════════════════════
@@ -315,29 +345,76 @@ class EffectSystem {
         break;
 
       case 'poison_cloud':
-        // Lingering green cloud dots spreading around the target
+        // Subtle green cloud dots spreading around the target
         this.particles.push({
           x: x, y: y, vx: 0, vy: 0,
-          life: 0.8, maxLife: 0.8,
-          color: '#66BB6A', size: radius,
+          life: 0.45, maxLife: 0.45,
+          color: '#66BB6A', size: radius * 0.65,
           gravity: 0, friction: 1.0,
           type: 'ring'
         });
-        for (var i = 0; i < 28; i++) {
+        for (var i = 0; i < 12; i++) {
           var angle = Math.random() * Math.PI * 2;
-          var dist = Math.random() * radius * 0.55;
+          var dist = Math.random() * radius * 0.38;
           this.particles.push({
             x: x + Math.cos(angle) * dist,
             y: y + Math.sin(angle) * dist * 0.55,
-            vx: (Math.random() - 0.5) * 45,
-            vy: -20 - Math.random() * 35,
-            life: 0.7 + Math.random() * 0.45,
-            maxLife: 1.15,
-            color: i % 2 === 0 ? '#76FF03' : '#2E7D32',
-            size: 5 + Math.random() * 7,
+            vx: (Math.random() - 0.5) * 25,
+            vy: -10 - Math.random() * 18,
+            life: 0.45 + Math.random() * 0.25,
+            maxLife: 0.7,
+            color: i % 2 === 0 ? '#8BC34A' : '#2E7D32',
+            size: 3 + Math.random() * 4,
             gravity: -10,
             friction: 0.94,
             type: 'circle'
+          });
+        }
+        break;
+
+      case 'fire_burst':
+        this.particles.push({
+          x: x, y: y, vx: 0, vy: 0,
+          life: 0.5, maxLife: 0.5,
+          color: '#FF5722', size: radius,
+          gravity: 0, friction: 1.0,
+          type: 'ring'
+        });
+        for (var i = 0; i < 26; i++) {
+          var angle = Math.random() * Math.PI * 2;
+          var speed = 90 + Math.random() * 190;
+          this.particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.35 + Math.random() * 0.25,
+            maxLife: 0.6,
+            color: i % 3 === 0 ? '#FFD54F' : (i % 3 === 1 ? '#FF5722' : '#D84315'),
+            size: 3 + Math.random() * 5,
+            gravity: -20,
+            friction: 0.9,
+            type: 'spark'
+          });
+        }
+        break;
+
+      case 'fire_cone':
+        for (var i = 0; i < 30; i++) {
+          var spread = (Math.random() - 0.5) * Math.PI * 0.75;
+          var speed = 120 + Math.random() * 180;
+          this.particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(spread) * speed,
+            vy: Math.sin(spread) * speed,
+            life: 0.25 + Math.random() * 0.25,
+            maxLife: 0.5,
+            color: i % 2 === 0 ? '#FFAB00' : '#FF5722',
+            size: 3 + Math.random() * 5,
+            gravity: -15,
+            friction: 0.92,
+            type: 'spark'
           });
         }
         break;

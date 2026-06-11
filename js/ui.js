@@ -102,7 +102,7 @@ class UIManager {
     card.appendChild(stats);
 
     // Hero badge for superheroes
-    const isHero = (charId === 'one_punch_man' || charId === 'blood_demon' || charId === 'train_conductor' || charId == 'super_summoner');
+    const isHero = (charId === 'one_punch_man' || charId === 'blood_demon' || charId === 'train_conductor' || charId === 'super_summoner' || charId === 'vulcan');
     if (isHero) {
       const badge = document.createElement('div');
       badge.className = 'hero-badge';
@@ -453,21 +453,30 @@ class UIManager {
 
       let lifestealText = char.lifesteal > 0 ? (char.lifesteal * 100).toFixed(0) + '%' : '无';
       let weaponText = char.weaponType === 'melee' ? '近战' : '远程';
-      let passiveHtml = '';
-      if (char.passives && char.passives.length > 0) {
-        passiveHtml = `
-          <div class="codex-passives">
-            <div class="skill-header">
-              <span class="skill-name">被动能力</span>
-            </div>
-            ${char.passives.map(passive => `
-              <p class="skill-desc"><strong>${passive.name}</strong>: ${passive.description}</p>
-            `).join('')}
+      const passiveItems = char.passives && char.passives.length > 0 ? char.passives : [{ name: '无', description: '没有额外被动能力。' }];
+      const specialItems = char.specialEffects && char.specialEffects.length > 0 ? char.specialEffects : [{ name: '无', description: '没有额外特殊效果。' }];
+      const passiveHtml = `
+        <div class="codex-passives">
+          <div class="skill-header">
+            <span class="skill-name">被动能力</span>
           </div>
-        `;
-      }
+          ${passiveItems.map(passive => `
+            <p class="skill-desc"><strong>${passive.name}</strong>: ${passive.description}</p>
+          `).join('')}
+        </div>
+      `;
+      const specialHtml = `
+        <div class="codex-specials">
+          <div class="skill-header">
+            <span class="skill-name">特殊效果</span>
+          </div>
+          ${specialItems.map(effect => `
+            <p class="skill-desc"><strong>${effect.name}</strong>: ${effect.description}</p>
+          `).join('')}
+        </div>
+      `;
       
-      const isHero = (id === 'one_punch_man' || id === 'blood_demon' || id === 'train_conductor' || id === 'super_summoner');
+      const isHero = (id === 'one_punch_man' || id === 'blood_demon' || id === 'train_conductor' || id === 'super_summoner' || id === 'vulcan');
       const badgeHtml = isHero ? '<div class="hero-badge" style="top: 8px; left: 8px; font-size: 12px; padding: 4px 8px;">⭐ 英雄</div>' : '';
 
       card.innerHTML = `
@@ -504,6 +513,7 @@ class UIManager {
           </p>
         </div>
         ${passiveHtml}
+        ${specialHtml}
       `;
       codexGrid.appendChild(card);
     });

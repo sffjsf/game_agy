@@ -791,6 +791,22 @@ html, body {
   margin-top: 6px;
 }
 
+.codex-specials {
+  background: rgba(255, 171, 0, 0.1);
+  border: 1px solid rgba(255, 171, 0, 0.25);
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.codex-specials .skill-name {
+  color: #FFD54F;
+}
+
+.codex-specials .skill-desc + .skill-desc {
+  margin-top: 6px;
+}
+
 .skill-header {
   display: flex;
   justify-content: space-between;

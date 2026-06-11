@@ -1086,6 +1086,9 @@ const CHARACTERS = {
     aiTendency: 'balanced',
     weaponType: 'ranged',
     projectileType: 'bomb',
+    specialEffects: [
+      { name: '范围炸弹', description: '普通攻击命中后会在目标附近爆炸，造成范围伤害。' }
+    ],
     skill: {
       name: '爆裂炸弹',
       nameEN: 'Blast Bomb',
@@ -1154,6 +1157,10 @@ const CHARACTERS = {
     projectileType: 'poison',
     passives: [
       { id: 'poison_trail', name: '毒雾足迹', description: '移动时在身后留下数秒毒雾，使敌人中毒。' }
+    ],
+    specialEffects: [
+      { name: '毒弹', description: '普通攻击命中后使敌人中毒并短暂减速。' },
+      { name: '持续毒雾', description: '毒雾区域会持续让敌人中毒。' }
     ],
     skill: {
       name: '毒雾瓶',
@@ -1224,6 +1231,9 @@ const CHARACTERS = {
     passives: [
       { id: 'spear_pierce', name: '长枪穿刺', description: '普通攻击命中时会穿透直线上的其他敌人，造成较低伤害。' }
     ],
+    specialEffects: [
+      { name: '直线穿刺', description: '技能会伤害前方直线范围内的敌人。' }
+    ],
     skill: {
       name: '突刺',
       nameEN: 'Piercing Thrust',
@@ -1284,6 +1294,9 @@ const CHARACTERS = {
     aiTendency: 'cautious',
     weaponType: 'ranged',
     projectileType: 'magic',
+    specialEffects: [
+      { name: '大范围冰霜', description: '技能会在超大范围内减速敌人。' }
+    ],
     skill: {
       name: '冰霜新星',
       nameEN: 'Frost Nova',
@@ -1319,7 +1332,78 @@ const CHARACTERS = {
   },
 
   // ═══════════════════════════════════════════════════════════════
-  // 17. SUMMONED GOLEM (召唤巨石) - Minion (Hidden)
+  // 17. VULCAN (火神) - Fire Superhero
+  // ═══════════════════════════════════════════════════════════════
+  vulcan: {
+    id: 'vulcan',
+    name: 'Vulcan',
+    nameCN: '火神',
+    color: '#FF5722',
+    secondaryColor: '#FFD54F',
+    glowColor: 'rgba(255, 87, 34, 0.55)',
+    size: 38,
+    speed: 4.8,
+    hp: 120,
+    attackPower: 18,
+    attackSpeed: 0.95,
+    chargeTime: 0.25,
+    attackRange: 190,
+    lifesteal: 0,
+    movePattern: 'linear',
+    aiTendency: 'aggressive',
+    weaponType: 'melee',
+    projectileType: null,
+    passives: [
+      { id: 'fire_cone_basic', name: '神焰吐息', description: '普通攻击改为扇形放火，使敌人进入着火状态。' },
+      { id: 'inferno_rebirth', name: '浴火重生', description: '每场战斗首次受到致命伤害时恢复 45 生命，并点燃周围敌人。' }
+    ],
+    specialEffects: [
+      { name: '着火状态', description: '着火敌人会持续扣血，并成为火神技能的爆炸核心。' },
+      { name: '连锁爆燃', description: '技能会引爆场上所有着火敌人及其四周区域。' }
+    ],
+    skill: {
+      name: '天火爆燃',
+      nameEN: 'Inferno Detonation',
+      cooldown: 9,
+      damage: 34,
+      range: 1000,
+      type: 'inferno_detonation',
+      duration: 0,
+      area: 115,
+      burnDuration: 3.5,
+      burnDps: 6
+    },
+    drawDecorations: function(ctx, x, y, angle, size, time) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Crown-like flame plume
+      var flamePulse = Math.sin(time * 9) * 4;
+      ctx.fillStyle = '#FFD54F';
+      ctx.strokeStyle = '#FF6F00';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.2, -size * 0.55);
+      ctx.quadraticCurveTo(size * 0.2, -size * 1.45 - flamePulse, size * 0.55, -size * 0.55);
+      ctx.quadraticCurveTo(size * 0.2, -size * 0.8, -size * 0.2, -size * 0.55);
+      ctx.fill();
+      ctx.stroke();
+
+      // Burning gauntlets
+      ctx.fillStyle = '#FF6F00';
+      ctx.shadowColor = '#FFAB00';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(size * 0.85, -size * 0.36, size * 0.22, 0, Math.PI * 2);
+      ctx.arc(size * 0.85, size * 0.36, size * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 18. SUMMONED GOLEM (召唤巨石) - Minion (Hidden)
   // ═══════════════════════════════════════════════════════════════
   summoned_golem: {
     id: 'summoned_golem',
