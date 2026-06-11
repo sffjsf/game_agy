@@ -228,9 +228,10 @@ class UIManager {
   updateHUD(teamLeft, teamRight) {
     if (!teamLeft || !teamRight) return;
 
-    // Left Names joined
+    // Left Names joined (only main non-hidden heroes)
     this.leftName.innerHTML = '';
-    teamLeft.forEach((f, idx) => {
+    const mainLeft = teamLeft.filter(f => !f.charData.hidden);
+    mainLeft.forEach((f, idx) => {
       if (idx > 0) {
         const plus = document.createElement('span');
         plus.textContent = ' + ';
@@ -247,9 +248,10 @@ class UIManager {
       this.leftName.appendChild(span);
     });
 
-    // Right Names joined
+    // Right Names joined (only main non-hidden heroes)
     this.rightName.innerHTML = '';
-    teamRight.forEach((f, idx) => {
+    const mainRight = teamRight.filter(f => !f.charData.hidden);
+    mainRight.forEach((f, idx) => {
       if (idx > 0) {
         const plus = document.createElement('span');
         plus.textContent = ' + ';
