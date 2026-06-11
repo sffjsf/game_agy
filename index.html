@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D Battle Arena - 多角色战斗系统</title>
+  <meta name="description" content="A 2D multi-character auto-battle system with 8 unique fighters">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ═══════════ Character Selection Screen ═══════════ -->
+  <div id="select-screen" class="screen">
+    <h1 class="game-title">⚔️ Battle Arena</h1>
+    <p class="game-subtitle">选择你的战士</p>
+    <div class="select-container">
+      <div class="team-panel" id="left-panel">
+        <h2 class="team-title">左方战士</h2>
+        <div class="character-grid" id="left-grid"></div>
+      </div>
+      <div class="vs-divider">
+        <span>VS</span>
+      </div>
+      <div class="team-panel" id="right-panel">
+        <h2 class="team-title">右方战士</h2>
+        <div class="character-grid" id="right-grid"></div>
+      </div>
+    </div>
+    <button id="start-btn" class="btn-primary" disabled>选择角色开始战斗</button>
+  </div>
+
+  <!-- ═══════════ Battle Screen ═══════════ -->
+  <div id="battle-screen" class="screen" style="display:none">
+    <div id="battle-hud">
+      <div class="hud-fighter left-fighter">
+        <span class="hud-name" id="left-name">---</span>
+        <div class="hp-bar-outer">
+          <div class="hp-bar-inner" id="left-hp-bar"></div>
+        </div>
+        <span class="hp-text" id="left-hp-text">100/100</span>
+      </div>
+      <div class="hud-vs">VS</div>
+      <div class="hud-fighter right-fighter">
+        <span class="hud-name" id="right-name">---</span>
+        <div class="hp-bar-outer">
+          <div class="hp-bar-inner" id="right-hp-bar"></div>
+        </div>
+        <span class="hp-text" id="right-hp-text">100/100</span>
+      </div>
+    </div>
+    <div id="canvas-container">
+      <canvas id="battle-canvas"></canvas>
+    </div>
+    <div id="countdown-overlay" style="display:none">
+      <span id="countdown-text">3</span>
+    </div>
+  </div>
+
+  <!-- ═══════════ Result Screen ═══════════ -->
+  <div id="result-screen" class="screen overlay" style="display:none">
+    <div class="result-card">
+      <h2 class="result-title" id="result-title">🏆 胜利!</h2>
+      <p class="result-winner" id="result-winner">---</p>
+      <p class="result-time" id="result-time">战斗时间: 0s</p>
+      <div class="result-buttons">
+        <button id="rematch-btn" class="btn-primary">⚔️ 再来一局</button>
+        <button id="reselect-btn" class="btn-secondary">🔄 重新选择</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ Scripts (dependency order) ═══════════ -->
+  <script src="js/characters.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/weapon.js"></script>
+  <script src="js/fighter.js"></script>
+  <script src="js/combat.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
