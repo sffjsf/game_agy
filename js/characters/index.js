@@ -14,6 +14,7 @@ import { bomber } from './Bomber.js';
 import { poisoner } from './Poisoner.js';
 import { spearman } from './Spearman.js';
 import { frost_apprentice } from './FrostApprentice.js';
+import { berserker } from './Berserker.js';
 import { vulcan } from './Vulcan.js';
 import { summoned_golem } from './SummonedGolem.js';
 import { erlang_shen } from './ErlangShen.js';
@@ -120,6 +121,7 @@ export const characterData = {
   poisoner,
   spearman,
   frost_apprentice,
+  berserker,
   vulcan,
   summoned_golem,
   erlang_shen,

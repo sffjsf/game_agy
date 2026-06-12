@@ -67,7 +67,7 @@ export class FighterAI {
 
     // Convert speed: charData.speed is px/frame at 60fps → px/sec = speed * 60
     var baseSpeed = this.fighter.charData.speed * 60;
-    var moveSpeed = baseSpeed * dt * (this.fighter.isSlowed() ? 0.5 : 1.0);
+    var moveSpeed = baseSpeed * dt * this.fighter.getSpeedMultiplier();
 
     const dir = safeDirection(
       this.fighter.target.x - this.fighter.x,
@@ -244,7 +244,7 @@ export class FighterAI {
 
     const effectSystem = ctx.effectSystem;
     var baseSpeed = this.fighter.charData.speed * 60;
-    var moveSpeed = baseSpeed * dt * (this.fighter.isSlowed() ? 0.5 : 1.0);
+    var moveSpeed = baseSpeed * dt * this.fighter.getSpeedMultiplier();
 
     var dx = this.fighter.target.x - this.fighter.x;
     var dy = this.fighter.target.y - this.fighter.y;

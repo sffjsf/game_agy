@@ -17,6 +17,7 @@ import { executeSummonBats } from './abilities/SummonBats.js';
 import { executeTrainStampede } from './abilities/TrainStampede.js';
 import { executeSummonLegion } from './abilities/SummonLegion.js';
 import { executeHavocInHeaven } from './abilities/HavocInHeaven.js';
+import { executeWhirlwind, executeWhirlwindTick, executeWhirlwindDamage } from './abilities/Whirlwind.js';
 import { safeFinite } from '../utils.js';
 
 /**
@@ -46,7 +47,35 @@ const skillExecutors = {
   train_stampede:     executeTrainStampede,
   summon_legion:      executeSummonLegion,
   havoc_in_heaven:    executeHavocInHeaven,
+  whirlwind:          executeWhirlwind,
 };
+
+/**
+ * Channeling handlers — for skills that persist over time.
+ * Each entry has:
+ *   tick(caster, skill, effectSystem, dt)   — called every frame
+ *   damage(caster, skill, effectSystem)      — called every damage interval
+ */
+const channelHandlers = {
+  whirlwind: {
+    tick:   executeWhirlwindTick,
+    damage: executeWhirlwindDamage,
+  },
+};
+
+export function isChannelingSkill(skillType) {
+  return !!channelHandlers[skillType];
+}
+
+export function executeChannelTick(caster, skill, effectSystem, dt) {
+  const h = channelHandlers[skill.type];
+  if (h && h.tick) h.tick(caster, skill, effectSystem, dt);
+}
+
+export function executeChannelDamage(caster, skill, effectSystem) {
+  const h = channelHandlers[skill.type];
+  if (h && h.damage) h.damage(caster, skill, effectSystem);
+}
 
 export function executeSkillStrategy(caster, skill, weaponSystem, effectSystem) {
     if (!caster.target) return;

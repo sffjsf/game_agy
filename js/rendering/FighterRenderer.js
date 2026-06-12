@@ -113,6 +113,59 @@ export class FighterRenderer {
       ctx.restore();
     }
 
+    // ── Blood rage aura (Berserker passive) ──
+    if (f.hasPassive('blood_rage') && f.hp < f.maxHp) {
+      const hpPercent = f.hp / f.maxHp;
+      const rageIntensity = (1 - hpPercent) * 0.45; // stronger glow at lower HP
+      const pulseSize = Math.sin(time * 8) * 3;
+
+      ctx.save();
+      ctx.globalAlpha = rageIntensity;
+      ctx.strokeStyle = '#FF1744';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#FF1744';
+      ctx.shadowBlur = 10 + rageIntensity * 8;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.charData.size + 6 + pulseSize, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ── Whirlwind spin visual (continuous rotating slashes) ──
+    if (f.state === 'channeling' && f.channelTimer > 0) {
+      var spinProgress = 1 - (f.channelTimer / (f.charData.skill.duration || 2.0));
+      var spinAlpha = 0.5 + Math.sin(time * 12) * 0.15;
+
+      ctx.save();
+      // Rotating slash arcs
+      for (var s = 0; s < 3; s++) {
+        var slashAngle = f.angle + (s * Math.PI * 2 / 3) + time * 12;
+        ctx.save();
+        ctx.globalAlpha = spinAlpha * 0.7;
+        ctx.strokeStyle = f.charData.secondaryColor;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = f.charData.secondaryColor;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.charData.size + 18,
+                slashAngle - 0.6, slashAngle + 0.6);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Expanding ring pulsing outward
+      ctx.globalAlpha = 0.25 + Math.sin(time * 15) * 0.1;
+      ctx.strokeStyle = f.charData.color;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = f.charData.glowColor;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.charData.size + 22 + Math.sin(time * 10) * 5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
     // ── Clone rendering (ninja) ──
     if (f.clones.length > 0 && f.cloneTimer > 0) {
       ctx.save();

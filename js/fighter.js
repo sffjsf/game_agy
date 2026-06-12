@@ -7,6 +7,7 @@ import { BuffManager } from './buffs/BuffManager.js';
 import { BattleContext } from './BattleContext.js';
 import { FighterRenderer } from './rendering/FighterRenderer.js';
 import { AttackHandler } from './combat/AttackHandler.js';
+import { isChannelingSkill, executeChannelTick, executeChannelDamage } from './skills/SkillRegistry.js';
 
 /**
  * fighter.js - Fighter Class for 2D Auto-Battle Game
@@ -94,6 +95,10 @@ export class Fighter {
     this.whistleCooldown = 0;
     this.rebirthUsed = false;
 
+    // Channeling skill state (e.g. Berserker whirlwind)
+    this.channelTimer = 0;
+    this.channelTick = 0;
+
     // Reference to enemy target (set externally)
     this.target = null;
     this.ai = new FighterAI(this);
@@ -166,7 +171,7 @@ export class Fighter {
 
     // ── Update all timers ──
     this.stateTimer += dt;
-    var attackTimerRate = this.buffs.slowAttackRate();
+    var attackTimerRate = this.getAttackTimerRate();
     this.attackTimer = Math.max(0, this.attackTimer - dt * attackTimerRate);
     this.skillCooldown = Math.max(0, this.skillCooldown - dt);
     this.buffs.update(dt, effectSystem);
@@ -191,8 +196,8 @@ export class Fighter {
       return;
     }
 
-    // ── Update facing angle toward target ──
-    if (this.target && this.target.isAlive()) {
+    // ── Update facing angle toward target (skip during whirlwind spin) ──
+    if (this.state !== 'channeling' && this.target && this.target.isAlive()) {
       const faceDir = safeDirection(
         this.target.x - this.x,
         this.target.y - this.y
@@ -328,9 +333,36 @@ export class Fighter {
           this.attackExecuted = true;
           this.executeSkill(weaponSystem, effectSystem);
         }
-        // Skill animation time
-        if (this.stateTimer >= 0.5) {
-          // Reposition to back away or flank after a skill
+        // Channeling skills → persistent state, otherwise reposition
+        if (this.charData.skill && isChannelingSkill(this.charData.skill.type)) {
+          if (this.stateTimer >= 0.3) {
+            this.setState('channeling');
+            this.channelTimer = this.charData.skill.duration || 2.0;
+            this.channelTick = 0;
+          }
+        } else if (this.stateTimer >= 0.5) {
+          this.ai.startReposition(ctx);
+        }
+        break;
+
+      // ───────────────────────────────────────────────
+      // CHANNELING: Persistent skill (whirlwind, etc.)
+      // ───────────────────────────────────────────────
+      case 'channeling':
+        this.channelTimer -= dt;
+        this.channelTick -= dt;
+
+        // Per-frame tick — visuals, rotation, movement
+        executeChannelTick(this, this.charData.skill, effectSystem, dt);
+
+        // Periodic damage tick
+        if (this.channelTick <= 0) {
+          this.channelTick = this.charData.skill.channelTickInterval || 0.25;
+          executeChannelDamage(this, this.charData.skill, effectSystem);
+        }
+
+        // Channeling ends
+        if (this.channelTimer <= 0) {
           this.ai.startReposition(ctx);
         }
         break;
@@ -557,7 +589,7 @@ export class Fighter {
   canCastSkillNow() {
     if (!this.skillReady || !this.charData.skill) return false;
     if (!this.target || !this.target.isAlive()) return false;
-    if (this.state === 'skill' || this.state === 'dashing_skill' || this.state === 'dead') return false;
+    if (this.state === 'skill' || this.state === 'dashing_skill' || this.state === 'channeling' || this.state === 'dead') return false;
 
     const dir = safeDirection(this.target.x - this.x, this.target.y - this.y);
     return dir.dist <= this.charData.skill.range;
@@ -684,7 +716,7 @@ export class Fighter {
         if (soundSystem) soundSystem.playDeathSound();
         this.setState('dead');
       }
-    } else if (this.state !== 'attack' && this.state !== 'skill' && this.state !== 'reposition' && this.state !== 'dashing_skill' && this.state !== 'dead') {
+    } else if (this.state !== 'attack' && this.state !== 'skill' && this.state !== 'reposition' && this.state !== 'dashing_skill' && this.state !== 'channeling' && this.state !== 'dead') {
       this.setState('hit');
     }
   }
@@ -788,6 +820,33 @@ export class Fighter {
       y: this.y,
       radius: this.charData.size
     };
+  }
+
+  /**
+   * Get effective attack timer rate, factoring in slow debuff and blood_rage passive.
+   * @returns {number} Multiplier (>1 = faster, <1 = slower)
+   */
+  getAttackTimerRate() {
+    let rate = this.buffs.slowAttackRate(); // 0.6 when slowed, 1.0 otherwise
+    // Blood rage: attack speed increases as HP decreases
+    if (this.hasPassive('blood_rage')) {
+      const hpPercent = this.hp / this.maxHp;
+      rate *= (1 + (1 - hpPercent) * 1.5); // up to 2.5x at 0% HP
+    }
+    return rate;
+  }
+
+  /**
+   * Get effective movement speed multiplier.
+   * @returns {number}
+   */
+  getSpeedMultiplier() {
+    let mult = this.isSlowed() ? 0.5 : 1.0;
+    // Blood rage: +25% move speed when HP below 35%
+    if (this.hasPassive('blood_rage') && this.hp < this.maxHp * 0.35) {
+      mult *= 1.25;
+    }
+    return mult;
   }
 
   /**
