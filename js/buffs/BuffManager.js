@@ -166,13 +166,13 @@ export class BuffManager {
   _tickPoisonTrail(dt, effectSystem) {
     const f = this.fighter;
     if (!f.hasPassive('poison_trail') || !f.alive || f.state === 'dead') return;
-    if (!f._addPoisonZone) return;  // only active during fighting
+    if (!f.battleContext.addPoisonZone) return;  // only active during fighting
 
     this.poisonTrail = Math.max(0, this.poisonTrail - dt);
     if (this.poisonTrail > 0) return;
 
     this.poisonTrail = 0.85;
-    f._addPoisonZone(f.x, f.y, f.team, 56, 3.2, 3.0, 0.8);
+    f.battleContext.addPoisonZone(f.x, f.y, f.team, 56, 3.2, 3.0, 0.8);
     EffectLib.addPoisonCloudEffect(effectSystem, f.x, f.y, '#66BB6A', 42);
   }
 

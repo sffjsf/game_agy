@@ -2,6 +2,7 @@ import * as EffectLib from './effects_lib/index.js';
 import { Fighter } from './fighter.js';
 import { WeaponSystem } from './weapon.js';
 import { EffectSystem } from './effects.js';
+import { BattleContext } from './BattleContext.js';
 import { safeFinite, safeDirection } from './utils.js';
 
 /**
@@ -119,17 +120,23 @@ export class CombatManager {
     }
 
     if (this.state === 'fighting') {
-      // Update left and right fighters — pass full context so fighters never need combatManager
-      const battleCallbacks = {
-        addPoisonZone: (...args) => this.addPoisonZone(...args),
-        applyAreaDamage: (x, y, ownerTeam, damage, radius, attacker) => this.applyAreaDamage(x, y, ownerTeam, damage, radius, attacker),
+      // Update left and right fighters — pass BattleContext so fighters never need combatManager
+      const shared = {
+        weaponSystem: this.weaponSystem,
+        effectSystem: this.effectSystem,
+        arenaWidth: this.arenaWidth,
+        arenaHeight: this.arenaHeight,
+        arenaX: this.arenaX,
+        arenaY: this.arenaY,
+        battleCallbacks: {
+          addPoisonZone: (...args) => this.addPoisonZone(...args),
+          applyAreaDamage: (x, y, ownerTeam, damage, radius, attacker) => this.applyAreaDamage(x, y, ownerTeam, damage, radius, attacker),
+        },
       };
-      this.fightersLeft.forEach(f => {
-        f.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY, this.fightersRight, this.fightersLeft, battleCallbacks);
-      });
-      this.fightersRight.forEach(f => {
-        f.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY, this.fightersLeft, this.fightersRight, battleCallbacks);
-      });
+      const ctxLeft  = new BattleContext({ ...shared, opposingTeam: this.fightersRight, ownTeam: this.fightersLeft });
+      const ctxRight = new BattleContext({ ...shared, opposingTeam: this.fightersLeft,  ownTeam: this.fightersRight });
+      this.fightersLeft.forEach(f  => f.update(dt, ctxLeft));
+      this.fightersRight.forEach(f => f.update(dt, ctxRight));
 
       this.updatePoisonZones(dt);
 

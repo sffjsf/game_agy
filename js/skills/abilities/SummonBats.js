@@ -15,7 +15,7 @@ export function executeSummonBats(caster, skill, weaponSystem, effectSystem, dx,
     var vy = Math.sin(batAngle) * speed;
     var batProj = createProjectile(caster.x, caster.y, vx, vy, skill.damage, caster.team, '#FF1744', 8, 'bat');
     batProj.attacker = caster;
-    batProj.opposingTeam = caster._opposingTeam;
+    batProj.opposingTeam = caster.battleContext.opposingTeam;
     weaponSystem.projectiles.push(batProj);
   }
   EffectLib.addCloneEffect(effectSystem, caster.x, caster.y, '#FF1744', 40);

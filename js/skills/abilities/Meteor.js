@@ -9,7 +9,7 @@ export function executeMeteor(caster, skill, weaponSystem, effectSystem, dx, dy,
   effectSystem.screenShake(10);
   const targetX = caster.target.x;
   const targetY = caster.target.y;
-  const opposingTeam = caster._opposingTeam;
+  const opposingTeam = caster.battleContext.opposingTeam;
   if (opposingTeam) {
     opposingTeam.forEach(enemy => {
       if (enemy.isAlive()) {

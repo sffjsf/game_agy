@@ -9,10 +9,10 @@ export function executePoisonCloud(caster, skill, weaponSystem, effectSystem, dx
   const targetY = caster.target.y;
   EffectLib.addPoisonCloudEffect(effectSystem, targetX, targetY, caster.charData.color, area);
   effectSystem.screenShake(3);
-  if (caster._addPoisonZone) {
-    caster._addPoisonZone(targetX, targetY, caster.team, area, skill.duration || 3.0, skill.poisonDps || 4.0, 1.2);
+  if (caster.battleContext.addPoisonZone) {
+    caster.battleContext.addPoisonZone(targetX, targetY, caster.team, area, skill.duration || 3.0, skill.poisonDps || 4.0, 1.2);
   }
-  const opposingTeam = caster._opposingTeam;
+  const opposingTeam = caster.battleContext.opposingTeam;
   if (opposingTeam) {
     opposingTeam.forEach(enemy => {
       if (enemy.isAlive()) {

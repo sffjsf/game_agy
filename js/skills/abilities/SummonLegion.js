@@ -4,7 +4,7 @@ import { createProjectile } from '../../combat/Projectile.js';
 import { soundSystem } from '../../audio.js';
 export function executeSummonLegion(caster, skill, weaponSystem, effectSystem, dx, dy, dist) {
 {
-  const teamArr = caster._ownTeam;
+  const teamArr = caster.battleContext.ownTeam;
   if (teamArr) {
     for (var i = 0; i < 3; i++) {
       var spawnX = caster.x + (Math.random() - 0.5) * 80;

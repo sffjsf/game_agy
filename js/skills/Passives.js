@@ -8,7 +8,7 @@ export function applyMeleeHitPassives(fighter, damage, primaryTarget, effectSyst
   if (fighter.hasPassive('saitama_splash')) {
     EffectLib.addMeteorEffect(effectSystem, primaryTarget.x, primaryTarget.y, '#FFD700', 70);
     effectSystem.screenShake(5);
-    const opposingTeam = fighter._opposingTeam;
+    const opposingTeam = fighter.battleContext.opposingTeam;
     if (opposingTeam) {
       opposingTeam.forEach(enemy => {
         if (!enemy.isAlive() || enemy === primaryTarget) return;
@@ -41,13 +41,13 @@ export function applyMeleeHitPassives(fighter, damage, primaryTarget, effectSyst
 
   if (fighter.hasPassive('havoc_proc') && Math.random() < 0.5) {
     if (fighter.charData.skill && fighter.charData.skill.type === 'havoc_in_heaven') {
-      executeHavocInHeaven(fighter, fighter.charData.skill, fighter._weaponSystem, effectSystem);
+      executeHavocInHeaven(fighter, fighter.charData.skill, fighter.battleContext.weaponSystem, effectSystem);
     }
   }
 }
 
 export function applyPiercingLineDamage(fighter, damage, range, width, primaryTarget, effectSystem) {
-  const opposingTeam = fighter._opposingTeam;
+  const opposingTeam = fighter.battleContext.opposingTeam;
   if (!opposingTeam) return;
   var dirX = Math.cos(fighter.angle);
   var dirY = Math.sin(fighter.angle);
@@ -65,7 +65,7 @@ export function applyPiercingLineDamage(fighter, damage, range, width, primaryTa
 }
 
 export function performSummonerBasicAttack(fighter, effectSystem) {
-  const teamArr = fighter._ownTeam;
+  const teamArr = fighter.battleContext.ownTeam;
   if (!teamArr) return;
   var spawnX = fighter.x + (Math.random() - 0.5) * 60;
   var spawnY = fighter.y + (Math.random() - 0.5) * 60;
@@ -76,10 +76,10 @@ export function performSummonerBasicAttack(fighter, effectSystem) {
 }
 
 export function executeFireConeAttack(fighter, effectSystem) {
-  if (!fighter._opposingTeam) return;
+  if (!fighter.battleContext.opposingTeam) return;
   const range = fighter.charData.attackRange || 190;
   const coneHalfAngle = Math.PI / 4;
-  const opposingTeam = fighter._opposingTeam;
+  const opposingTeam = fighter.battleContext.opposingTeam;
   if (!opposingTeam) return;
   if (effectSystem.addFireCone) {
     effectSystem.addFireCone(fighter.x, fighter.y, fighter.angle, '#FF5722', range);
@@ -167,7 +167,7 @@ export function tryHeavenlyEye(fighter, opposingTeam, effectSystem) {
   
   // Create laser projectile that pieces all enemies
   let proj = createProjectile(fighter.x, fighter.y, vx, vy, damage, fighter.id, '#FFF176', 40, 'laser', fighter);
-  fighter._weaponSystem.projectiles.push(proj);
+  fighter.battleContext.weaponSystem.projectiles.push(proj);
 
   EffectLib.addStunEffect(effectSystem, fighter.x, fighter.y, '#FFD700', 30);
   soundSystem.playShootSound();
@@ -216,7 +216,7 @@ export function tryLethalSurvivalPassives(fighter, effectSystem) {
     EffectLib.addFireBurstEffect(effectSystem, fighter.x, fighter.y, '#FF5722', 150);
     effectSystem.screenShake(14);
     effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 18, '浴火重生!', false, '#FFD54F');
-    const opposingTeam = fighter._opposingTeam;
+    const opposingTeam = fighter.battleContext.opposingTeam;
     if (opposingTeam) {
       opposingTeam.forEach(enemy => {
         if (!enemy.isAlive()) return;

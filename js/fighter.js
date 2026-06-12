@@ -1,11 +1,12 @@
-import * as EffectLib from './effects_lib/index.js';
 import * as Passives from './skills/Passives.js';
 import { FighterAI } from './ai/FighterAI.js';
-import { executeSkillStrategy } from './skills/SkillRegistry.js';
 import { characterData } from './characters/index.js';
 import { soundSystem } from './audio.js';
 import { safeFinite, safeDirection, clamp, normaliseAngle } from './utils.js';
 import { BuffManager } from './buffs/BuffManager.js';
+import { BattleContext } from './BattleContext.js';
+import { FighterRenderer } from './rendering/FighterRenderer.js';
+import { AttackHandler } from './combat/AttackHandler.js';
 
 /**
  * fighter.js - Fighter Class for 2D Auto-Battle Game
@@ -144,28 +145,12 @@ export class Fighter {
   /**
    * Full update: timers, state machine, movement, combat.
    * @param {number} dt - Delta time in seconds
-   * @param {WeaponSystem} weaponSystem - For creating attacks
-   * @param {EffectSystem} effectSystem - For visual effects
-   * @param {number} arenaWidth - Arena width in pixels
-   * @param {number} arenaHeight - Arena height in pixels
-   * @param {number} arenaX - Arena left offset (optional, default 0)
-   * @param {number} arenaY - Arena top offset (optional, default 0)
-   * @param {Fighter[]} opposingTeam - Enemy team fighters
-   * @param {Fighter[]} ownTeam - Friendly team fighters
-   * @param {{addPoisonZone: Function, applyAreaDamage: Function}} battleCallbacks - Cross-cutting callbacks
+   * @param {BattleContext} ctx - Bundled battle context (weaponSystem, effectSystem, arena, teams, callbacks)
    */
-  update(dt, weaponSystem, effectSystem, arenaWidth, arenaHeight, arenaX, arenaY, opposingTeam, ownTeam, battleCallbacks) {
-    arenaX = arenaX || 0;
-    arenaY = arenaY || 0;
-    arenaWidth = arenaWidth || 800;
-    arenaHeight = arenaHeight || 500;
-
-    // Transient battle context — set each frame so passives/skills never need combatManager
-    this._opposingTeam = opposingTeam || [];
-    this._ownTeam = ownTeam || [];
-    this._weaponSystem = weaponSystem;
-    this._addPoisonZone = (battleCallbacks && battleCallbacks.addPoisonZone) || null;
-    this._applyAreaDamage = (battleCallbacks && battleCallbacks.applyAreaDamage) || null;
+  update(dt, ctx) {
+    // Store the battle context so skills, passives, and buffs can access it
+    this.battleContext = ctx;
+    const { weaponSystem, effectSystem, arenaWidth, arenaHeight, arenaX, arenaY, opposingTeam, ownTeam } = ctx;
 
     // Sanitize state variables at start of update to prevent NaN propagation
     this.x  = safeFinite(this.x, arenaX + arenaWidth / 2);
@@ -271,10 +256,10 @@ export class Fighter {
           if (this.repositionType === 'waypoint') {
             this.repositionType = Math.random() < 0.65 ? 'circle' : 'retreat';
           }
-          this.ai.applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem);
+          this.ai.applyRepositionMovement(dt, ctx);
         } else {
           // Apply standard movement pattern
-          this.ai.applyMovement(dt, arenaWidth, arenaHeight, effectSystem);
+          this.ai.applyMovement(dt, ctx);
         }
 
         // Apply AI behavior modifications
@@ -292,7 +277,7 @@ export class Fighter {
 
         // Melee units continue chasing at 80% speed during charge to stay close to moving enemies
         if (this.charData.weaponType === 'melee') {
-          this.ai.applyMovement(dt * 0.8, arenaWidth, arenaHeight, effectSystem);
+          this.ai.applyMovement(dt * 0.8, ctx);
         }
 
         // When charge time is reached, execute attack
@@ -324,11 +309,11 @@ export class Fighter {
       // ───────────────────────────────────────────────
       case 'cooldown':
         // Move during cooldown!
-        this.ai.applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem);
+        this.ai.applyRepositionMovement(dt, ctx);
         if (this.stateTimer >= this.charData.attackSpeed * 0.3) {
           // 85% chance to perform an extended tactical reposition, otherwise chase
           if (Math.random() < 0.85) {
-            this.ai.startReposition(arenaWidth, arenaHeight, arenaX, arenaY);
+            this.ai.startReposition(ctx);
           } else {
             this.setState('chase');
           }
@@ -346,7 +331,7 @@ export class Fighter {
         // Skill animation time
         if (this.stateTimer >= 0.5) {
           // Reposition to back away or flank after a skill
-          this.ai.startReposition(arenaWidth, arenaHeight, arenaX, arenaY);
+          this.ai.startReposition(ctx);
         }
         break;
 
@@ -359,7 +344,7 @@ export class Fighter {
           break;
         }
 
-        this.ai.applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem);
+        this.ai.applyRepositionMovement(dt, ctx);
 
         // Reposition for a short time, then resume chasing
         if (this.stateTimer >= this.repositionDuration) {
@@ -400,7 +385,7 @@ export class Fighter {
         if (dashPct >= 1) {
           this.x = this.dashTargetX;
           this.y = this.dashTargetY;
-          this.executeDashingSkillHit(effectSystem, arenaWidth, arenaHeight, arenaX, arenaY);
+          this.executeDashingSkillHit();
         }
         break;
 
@@ -452,60 +437,7 @@ export class Fighter {
    * @param {EffectSystem} effectSystem
    */
   executeAttack(weaponSystem, effectSystem) {
-    if (!this.target || !this.target.isAlive()) return;
-
-    if (this.charData.weaponType === 'melee') {
-      if (this.hasPassive('fire_cone_basic')) {
-        this.executeFireConeAttack(effectSystem);
-        if (soundSystem) soundSystem.playSwingSound();
-        return;
-      }
-
-      // Give a slight lunge slide forward (20px) towards target on attack trigger
-      var dx = this.target.x - this.x;
-      var dy = this.target.y - this.y;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 1) {
-        var lungeDist = 20;
-        this.x += (dx / dist) * lungeDist;
-        this.y += (dy / dist) * lungeDist;
-      }
-
-      // Melee: check arc and range with 1.3x tolerance to compensate for high speed movement
-      var result = weaponSystem.createMeleeAttack(
-        this, this.target,
-        this.charData.attackPower,
-        this.charData.attackRange * 1.3,
-        this.angle
-      );
-
-      if (result.hit && this.target.isAlive()) {
-        this.applyMeleeHitPassives(result.damage, this.target, effectSystem);
-        this.target.takeDamage(result.damage, this.x, this.y, effectSystem);
-        this.healFromDamage(result.damage, effectSystem);
-
-        effectSystem.addHitEffect(this.target.x, this.target.y, this.charData.color);
-        effectSystem.screenShake(3);
-      }
-      if (soundSystem) soundSystem.playSwingSound();
-    } else {
-      // Ranged: spawn projectile or use a special ranged passive.
-      if (this.hasPassive('summoner_attack')) {
-        this.performSummonerBasicAttack(effectSystem);
-      } else {
-        weaponSystem.createRangedAttack(
-          this.x, this.y,
-          this.target.x, this.target.y,
-          this.charData.attackPower,
-          this.team,
-          this.charData.projectileType,
-          this.charData.color,
-          this,
-          this._opposingTeam
-        );
-        if (soundSystem) soundSystem.playShootSound();
-      }
-    }
+    AttackHandler.executeAttack(this, weaponSystem, effectSystem);
   }
 
   /**
@@ -811,72 +743,9 @@ export class Fighter {
 
   /**
    * Execute the hit/payload of a dashing skill after completing the smooth dash movement.
-   * @param {EffectSystem} effectSystem
-   * @param {number} arenaWidth
-   * @param {number} arenaHeight
-   * @param {number} arenaX
-   * @param {number} arenaY
    */
-  executeDashingSkillHit(effectSystem, arenaWidth, arenaHeight, arenaX, arenaY) {
-    if (!this.target || !this.target.isAlive()) {
-      this.setState('chase');
-      return;
-    }
-
-    var skill = this.charData.skill;
-    var dx = this.target.x - this.x;
-    var dy = this.target.y - this.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
-      dx = 0;
-      dy = 0;
-      dist = 1;
-    }
-
-    if (this.dashSkillType === 'dash') {
-      // Vampire dash damage & heal
-      if (dist <= 45) {
-        this.target.takeDamage(skill.damage, this.x, this.y, effectSystem);
-        this.healFromDamage(skill.damage, effectSystem);
-      }
-      effectSystem.screenShake(5);
-    } else if (this.dashSkillType === 'backstab') {
-      // Assassin backstab critical damage
-      if (dist <= skill.range + 20) {
-        this.target.takeDamage(skill.damage, this.x, this.y, effectSystem);
-        effectSystem.addDamageNumber(this.target.x, this.target.y - 40, skill.damage, true, '#FFD700');
-        EffectLib.addBackstabEffect(effectSystem, this.target.x, this.target.y, this.charData.color, 20);
-        effectSystem.screenShake(7);
-      }
-    } else if (this.dashSkillType === 'serious_punch') {
-      // One Punch Man serious punch
-      EffectLib.addMeteorEffect(effectSystem, this.x, this.y, '#FFD700', 90);
-      EffectLib.addAoeMeleeEffect(effectSystem, this.x, this.y, '#FF1744', 130);
-      effectSystem.screenShake(18);
-
-      const opposingTeam = this._opposingTeam;
-      if (opposingTeam) {
-        opposingTeam.forEach(enemy => {
-          if (enemy.isAlive()) {
-            const ex = enemy.x - this.x;
-            const ey = enemy.y - this.y;
-            const edist = Math.sqrt(ex * ex + ey * ey);
-            if (edist <= 130) {
-              enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
-            }
-          }
-        });
-      }
-    }
-
-    // Go to cooldown or reposition
-    if (Math.random() < 0.4) {
-      this.ai.startReposition(arenaWidth, arenaHeight, arenaX, arenaY);
-    } else {
-      this.setState('cooldown');
-      this.repositionType = (this.charData.weaponType === 'ranged') ? 'retreat' : (Math.random() < 0.65 ? 'circle' : 'retreat');
-      this.circleDir = Math.random() < 0.5 ? 1 : -1;
-    }
+  executeDashingSkillHit() {
+    AttackHandler.executeDashingSkillHit(this);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -889,12 +758,7 @@ export class Fighter {
    * @param {EffectSystem} effectSystem
    */
   executeSkill(weaponSystem, effectSystem) {
-    if (!this.target || !this.target.isAlive()) return;
-
-    var skill = this.charData.skill;
-    this.startSkillCast(effectSystem, skill, skill.nameCN || skill.name);
-
-    executeSkillStrategy(this, skill, weaponSystem, effectSystem);
+    AttackHandler.executeSkill(this, weaponSystem, effectSystem);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -907,132 +771,7 @@ export class Fighter {
    * @param {number} time - Elapsed time in seconds (for animations)
    */
   render(ctx, time) {
-    if (this.state === 'dead' && !this.alive) return;
-
-    ctx.save();
-
-    // ── Foot ground indicator ring (for team color) ──
-    const teamColor = this.team === 'left' ? '#00E5FF' : '#FF3D00';
-    
-    ctx.save();
-    // Solid base
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = teamColor;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.charData.size * 1.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Thick glowing border
-    ctx.globalAlpha = 1.0;
-    ctx.shadowColor = teamColor;
-    ctx.shadowBlur = 10;
-    ctx.strokeStyle = teamColor;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.charData.size * 1.5, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    // ── Body circle with glow ──
-    ctx.shadowColor = this.charData.glowColor;
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.charData.size, 0, Math.PI * 2);
-    ctx.fillStyle = this.charData.color;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Body border
-    ctx.strokeStyle = this.charData.secondaryColor;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Render Blood Shield Bubble
-    if (this.bloodShield > 0) {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255, 23, 68, 0.85)';
-      ctx.lineWidth = 3;
-      ctx.shadowColor = '#FF1744';
-      ctx.shadowBlur = 8;
-      ctx.setLineDash([4, 2]); // dotted shield line
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.charData.size * 1.25 + Math.sin(time * 10) * 2, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // ── Hit flash (white overlay) ──
-    if (this.hitFlashTimer > 0) {
-      ctx.save();
-      ctx.globalAlpha = this.hitFlashTimer / 0.15;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.charData.size, 0, Math.PI * 2);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // ── Debuff overlays (slow / poison / burn / stun) ──
-    this.buffs.render(ctx, time);
-
-    // ── Character decorations ──
-    if (typeof this.charData.drawDecorations === 'function') {
-      this.charData.drawDecorations(ctx, this.x, this.y, this.angle, this.charData.size, time);
-    }
-
-    // ── HP text centered on body ──
-    ctx.save();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = "bold 16px 'Outfit', sans-serif";
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.fillText(Math.ceil(this.hp), this.x, this.y);
-    ctx.restore();
-
-    // ── Charge glow ring (during charge state) ──
-    if (this.state === 'charge') {
-      var chargeProgress = this.stateTimer / this.charData.chargeTime;
-      var ringRadius = this.charData.size + 5 + chargeProgress * 10;
-
-      ctx.save();
-      ctx.globalAlpha = 0.3 + chargeProgress * 0.3;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, ringRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = this.charData.color;
-      ctx.lineWidth = 2 + chargeProgress * 2;
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // ── Clone rendering (ninja) ──
-    if (this.clones.length > 0 && this.cloneTimer > 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.4;
-
-      for (var i = 0; i < this.clones.length; i++) {
-        var clone = this.clones[i];
-
-        // Clone body
-        ctx.beginPath();
-        ctx.arc(clone.x, clone.y, this.charData.size, 0, Math.PI * 2);
-        ctx.fillStyle = this.charData.color;
-        ctx.fill();
-        ctx.strokeStyle = this.charData.secondaryColor;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Clone decorations
-        this.charData.drawDecorations(ctx, clone.x, clone.y, this.angle, this.charData.size, time);
-      }
-
-      ctx.restore();
-    }
-
-    ctx.restore();
+    FighterRenderer.render(this, ctx, time);
   }
 
   // ═══════════════════════════════════════════════════════════════

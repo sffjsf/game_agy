@@ -11,8 +11,8 @@ export function executeSummonHound(caster, skill, weaponSystem, effectSystem) {
   // Hound scales with caster's stats somewhat, or just flat base stats
   hound.charData.attackPower += caster.charData.attackPower * 0.3; // Gains 30% of Erlang's attack
 
-  if (caster._ownTeam) {
-    caster._ownTeam.push(hound);
+  if (caster.battleContext.ownTeam) {
+    caster.battleContext.ownTeam.push(hound);
   }
   
   // Stun effect as a summon poof

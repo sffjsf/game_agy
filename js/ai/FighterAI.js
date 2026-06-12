@@ -62,7 +62,7 @@ export class FighterAI {
     }
   }
 
-  applyMovement(dt, arenaWidth, arenaHeight, effectSystem) {
+  applyMovement(dt, ctx) {
     if (!this.fighter.target || !this.fighter.target.isAlive()) return;
 
     // Convert speed: charData.speed is px/frame at 60fps → px/sec = speed * 60
@@ -76,7 +76,7 @@ export class FighterAI {
 
     const strategy = this._movementStrategies[this.fighter.charData.movePattern];
     if (strategy) {
-      strategy(dt, moveSpeed, dir, effectSystem);
+      strategy(dt, moveSpeed, dir, ctx.effectSystem);
     }
   }
 
@@ -182,15 +182,15 @@ export class FighterAI {
     this.fighter.y += dir.dy * moveSpeed * 0.7 + wobbleY;
   }
 
-  startReposition(arenaWidth, arenaHeight, arenaX, arenaY) {
+  startReposition(ctx) {
     this.fighter.setState('reposition');
     // Reposition duration is longer for full map movements (e.g. 2.0s to 3.5s)
     this.fighter.repositionDuration = 2.0 + Math.random() * 1.5;
 
-    arenaX = arenaX || 20;
-    arenaY = arenaY || 10;
-    arenaWidth = arenaWidth || 800;
-    arenaHeight = arenaHeight || 500;
+    const arenaX = ctx.arenaX || 20;
+    const arenaY = ctx.arenaY || 10;
+    const arenaWidth = ctx.arenaWidth || 800;
+    const arenaHeight = ctx.arenaHeight || 500;
 
     if (this.fighter.charData.weaponType === 'ranged') {
       this.fighter.repositionType = 'waypoint';
@@ -239,9 +239,10 @@ export class FighterAI {
     }
   }
 
-  applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem) {
+  applyRepositionMovement(dt, ctx) {
     if (!this.fighter.target || !this.fighter.target.isAlive()) return;
 
+    const effectSystem = ctx.effectSystem;
     var baseSpeed = this.fighter.charData.speed * 60;
     var moveSpeed = baseSpeed * dt * (this.fighter.isSlowed() ? 0.5 : 1.0);
 

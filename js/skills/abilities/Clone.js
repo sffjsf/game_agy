@@ -17,7 +17,7 @@ export function executeClone(caster, skill, weaponSystem, effectSystem, dx, dy, 
 
   // Each clone fires a shuriken at the target
   for (var i = 0; i < caster.clones.length; i++) {
-    weaponSystem.createRangedAttack(caster.clones[i].x, caster.clones[i].y, caster.target.x, caster.target.y, skill.damage, caster.team, 'shuriken', caster.charData.color, caster, caster._opposingTeam);
+    weaponSystem.createRangedAttack(caster.clones[i].x, caster.clones[i].y, caster.target.x, caster.target.y, skill.damage, caster.team, 'shuriken', caster.charData.color, caster, caster.battleContext.opposingTeam);
   }
   return;
 }
