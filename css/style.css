@@ -136,10 +136,55 @@ html, body {
 /* ── Character Grid ── */
 
 .character-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 100%;
+}
+
+.char-category {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.1), transparent);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.category-header:hover {
+  background: linear-gradient(90deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+}
+
+.category-toggle {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.char-category.collapsed .category-toggle {
+  transform: rotate(-90deg);
+}
+
+.category-content {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   width: 100%;
+}
+
+.char-category.collapsed .category-content {
+  display: none;
 }
 
 /* ── Character Card ── */

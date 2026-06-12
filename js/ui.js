@@ -58,13 +58,26 @@ export class UIManager {
     this.rightGrid.innerHTML = '';
 
     const charIds = Object.keys(characterData);
+    
+    const heroes = [];
+    const regulars = [];
 
     charIds.forEach(id => {
       const char = characterData[id];
       if (char.hidden) return; // Hide summoned minions from selection
-      this.leftGrid.appendChild(this._createCard(id, char, 'left'));
-      this.rightGrid.appendChild(this._createCard(id, char, 'right'));
+      
+      if (char.isHero) {
+        heroes.push({ id, char });
+      } else {
+        regulars.push({ id, char });
+      }
     });
+
+    this._buildCategory('普通战士', regulars, 'left', this.leftGrid);
+    this._buildCategory('英雄角色', heroes, 'left', this.leftGrid);
+    
+    this._buildCategory('普通战士', regulars, 'right', this.rightGrid);
+    this._buildCategory('英雄角色', heroes, 'right', this.rightGrid);
 
     // Reset selections as arrays
     this.selectedLeft = [];
@@ -72,6 +85,32 @@ export class UIManager {
     this._updateGridVisuals('left');
     this._updateGridVisuals('right');
     this._updateStartButton();
+  }
+
+  _buildCategory(title, charList, side, parentGrid) {
+    if (charList.length === 0) return;
+
+    const categoryDiv = document.createElement('div');
+    categoryDiv.className = 'char-category';
+
+    const header = document.createElement('div');
+    header.className = 'category-header';
+    header.innerHTML = `<span>${title} (${charList.length})</span> <span class="category-toggle">▼</span>`;
+    
+    const content = document.createElement('div');
+    content.className = 'category-content';
+
+    header.addEventListener('click', () => {
+      categoryDiv.classList.toggle('collapsed');
+    });
+
+    charList.forEach(item => {
+      content.appendChild(this._createCard(item.id, item.char, side));
+    });
+
+    categoryDiv.appendChild(header);
+    categoryDiv.appendChild(content);
+    parentGrid.appendChild(categoryDiv);
   }
 
   _createCard(charId, char, side) {
@@ -163,11 +202,7 @@ export class UIManager {
     if (index > -1) {
       list.splice(index, 1);
     } else {
-      if (list.length < 5) {
-        list.push(charId);
-      } else {
-        alert('每队最多选择 5 个战士！');
-      }
+      list.push(charId);
     }
 
     this._updateGridVisuals(side);
