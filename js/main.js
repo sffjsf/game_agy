@@ -1,3 +1,6 @@
+import { CombatManager } from './combat.js';
+import { UIManager } from './ui.js';
+
 /**
  * main.js - Game entry point
  * Wires CombatManager + UIManager, runs the game loop.
@@ -5,7 +8,6 @@
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('battle-canvas');
   const combatManager = new CombatManager(canvas);
-  window.combatManager = combatManager; // Expose globally for AI targeting & skills
   const uiManager = new UIManager();
 
   /* ── Canvas sizing ────────────────────────────────────── */

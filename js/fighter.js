@@ -1,24 +1,24 @@
+import { executeSkillStrategy } from './skills/SkillRegistry.js';
+import { characterData } from './characters.js';
+import { soundSystem } from './audio.js';
+
 /**
  * fighter.js - Fighter Class for 2D Auto-Battle Game
  * 
- * The core combat entity. Implements state machine, movement patterns,
- * AI decision making, combat, skills, and rendering.
- * 
- * Depends on globals: CHARACTERS, EffectSystem, WeaponSystem
- * No modules/imports - loaded via script tag.
+ * Handles individual unit AI, states (chase, attack, skill), rendering,
+ * and massive switch statements for different character skills.
  */
-
-class Fighter {
+export class Fighter {
   /**
    * Create a new fighter from character data.
-   * @param {string} characterId - Key in the CHARACTERS object
+   * @param {string} characterId - Key in the characterData object
    * @param {number} x - Starting X position
    * @param {number} y - Starting Y position
    * @param {string} team - 'left' or 'right'
    */
   constructor(characterId, x, y, team) {
-    // Load character data from the global CHARACTERS object
-    this.charData = CHARACTERS[characterId];
+    // Load character data from the global characterData object
+    this.charData = characterData[characterId];
     if (!this.charData) {
       throw new Error('Unknown character ID: ' + characterId);
     }
@@ -532,7 +532,7 @@ class Fighter {
     if (this.charData.weaponType === 'melee') {
       if (this.hasPassive('fire_cone_basic')) {
         this.executeFireConeAttack(effectSystem);
-        if (window.soundSystem) window.soundSystem.playSwingSound();
+        if (soundSystem) soundSystem.playSwingSound();
         return;
       }
 
@@ -562,7 +562,7 @@ class Fighter {
         effectSystem.addHitEffect(this.target.x, this.target.y, this.charData.color);
         effectSystem.screenShake(3);
       }
-      if (window.soundSystem) window.soundSystem.playSwingSound();
+      if (soundSystem) soundSystem.playSwingSound();
     } else {
       // Ranged: spawn projectile or use a special ranged passive.
       if (this.hasPassive('summoner_attack')) {
@@ -577,7 +577,7 @@ class Fighter {
           this.charData.color,
           this
         );
-        if (window.soundSystem) window.soundSystem.playShootSound();
+        if (soundSystem) soundSystem.playShootSound();
       }
     }
   }
@@ -593,7 +593,7 @@ class Fighter {
       effectSystem.addSkillEffect('meteor', primaryTarget.x, primaryTarget.y, '#FFD700', 70);
       effectSystem.screenShake(5);
 
-      const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+      const opposingTeam = (this.team === 'left') ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
       if (opposingTeam) {
         opposingTeam.forEach(enemy => {
           if (!enemy.isAlive() || enemy === primaryTarget) return;
@@ -622,7 +622,7 @@ class Fighter {
    * @param {EffectSystem} effectSystem
    */
   applyPiercingLineDamage(damage, range, width, primaryTarget, effectSystem) {
-    const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+    const opposingTeam = (this.team === 'left') ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
     if (!opposingTeam) return;
 
     var dirX = Math.cos(this.angle);
@@ -646,15 +646,16 @@ class Fighter {
    * @param {EffectSystem} effectSystem
    */
   performSummonerBasicAttack(effectSystem) {
-    const teamArr = this.team === 'left' ? window.combatManager.fightersLeft : window.combatManager.fightersRight;
+    const teamArr = this.team === 'left' ? this.combatManager.fightersLeft : this.combatManager.fightersRight;
     if (!teamArr) return;
 
     var spawnX = this.x + (Math.random() - 0.5) * 60;
     var spawnY = this.y + (Math.random() - 0.5) * 60;
     var minion = new Fighter('summoned_golem', spawnX, spawnY, this.team);
+    minion.combatManager = this.combatManager;
     teamArr.push(minion);
     effectSystem.addSkillEffect('clone', spawnX, spawnY, '#E040FB', 30);
-    if (window.soundSystem) window.soundSystem.playSummonSound();
+    if (soundSystem) soundSystem.playSummonSound();
   }
 
   /**
@@ -662,11 +663,11 @@ class Fighter {
    * @param {EffectSystem} effectSystem
    */
   executeFireConeAttack(effectSystem) {
-    if (!window.combatManager) return;
+    if (!this.combatManager) return;
 
     const range = this.charData.attackRange || 190;
     const coneHalfAngle = Math.PI / 4;
-    const opposingTeam = this.team === 'left' ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+    const opposingTeam = this.team === 'left' ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
     if (!opposingTeam) return;
 
     if (effectSystem.addFireCone) {
@@ -1087,7 +1088,7 @@ class Fighter {
     this.skillCooldown = skill.cooldown || 0;
     this.skillReady = false;
 
-    if (window.soundSystem) window.soundSystem.playSkillSound();
+    if (soundSystem) soundSystem.playSkillSound();
     this.showSkillName(effectSystem, displayName || skill.name);
   }
 
@@ -1170,13 +1171,13 @@ class Fighter {
    */
   updatePoisonTrail(dt, effectSystem) {
     if (!this.hasPassive('poison_trail') || !this.alive || this.state === 'dead') return;
-    if (!window.combatManager || window.combatManager.state !== 'fighting') return;
+    if (!this.combatManager || this.combatManager.state !== 'fighting') return;
 
     this.poisonTrailTimer = Math.max(0, this.poisonTrailTimer - dt);
     if (this.poisonTrailTimer > 0) return;
 
     this.poisonTrailTimer = 0.85;
-    window.combatManager.addPoisonZone(this.x, this.y, this.team, 56, 3.2, 3.0, 0.8);
+    this.combatManager.addPoisonZone(this.x, this.y, this.team, 56, 3.2, 3.0, 0.8);
     effectSystem.addSkillEffect('poison_cloud', this.x, this.y, '#66BB6A', 42);
   }
 
@@ -1287,7 +1288,7 @@ class Fighter {
     effectSystem.addDamageNumber(this.x, this.y - this.charData.size, damage, false, damageColor);
     
     // Play hit sound
-    if (window.soundSystem) window.soundSystem.playHitSound();
+    if (soundSystem) soundSystem.playHitSound();
 
     // Knockback (5-8px away from attacker)
     var kbAngle = Math.atan2(this.y - attackerY, this.x - attackerX);
@@ -1307,7 +1308,7 @@ class Fighter {
       if (this.tryLethalSurvivalPassives(effectSystem)) {
         this.setState('chase');
       } else {
-        if (window.soundSystem) window.soundSystem.playDeathSound();
+        if (soundSystem) soundSystem.playDeathSound();
         this.setState('dead');
       }
     } else if (this.state !== 'attack' && this.state !== 'skill' && this.state !== 'reposition' && this.state !== 'dashing_skill' && this.state !== 'dead') {
@@ -1393,7 +1394,7 @@ class Fighter {
     effectSystem.screenShake(14);
     effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 18, '浴火重生!', false, '#FFD54F');
 
-    const opposingTeam = this.team === 'left' ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+    const opposingTeam = this.team === 'left' ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
     if (opposingTeam) {
       opposingTeam.forEach(enemy => {
         if (!enemy.isAlive()) return;
@@ -1466,7 +1467,7 @@ class Fighter {
       effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#FF1744', 130);
       effectSystem.screenShake(18);
 
-      const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+      const opposingTeam = (this.team === 'left') ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
       if (opposingTeam) {
         opposingTeam.forEach(enemy => {
           if (enemy.isAlive()) {
@@ -1515,386 +1516,7 @@ class Fighter {
       dist = 1;
     }
 
-    switch (skill.type) {
-
-      // ── WHIRLWIND (Swordsman): AOE damage around self ──
-      case 'aoe_melee': {
-        effectSystem.addSkillEffect('aoe_melee', this.x, this.y, this.charData.color, skill.range);
-        effectSystem.screenShake(6);
-
-        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
-        if (opposingTeam) {
-          opposingTeam.forEach(enemy => {
-            if (enemy.isAlive()) {
-              const ex = enemy.x - this.x;
-              const ey = enemy.y - this.y;
-              const edist = Math.sqrt(ex * ex + ey * ey);
-              if (edist <= skill.range) {
-                enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
-                this.healFromDamage(skill.damage, effectSystem);
-              }
-            }
-          });
-        }
-        break;
-      }
-
-      // ── TRIPLE SHOT (Archer): 3 arrows in a spread ──
-      case 'multi_shot': {
-        var baseAngle = Math.atan2(dy, dx);
-        var spreadAngle = Math.PI / 12; // 15 degrees
-
-        for (var i = -1; i <= 1; i++) {
-          var shotAngle = baseAngle + i * spreadAngle;
-          var speed = this.charData.projectileSpeed || 400;
-          var vx = Math.cos(shotAngle) * speed;
-          var vy = Math.sin(shotAngle) * speed;
-
-          var proj = new Projectile(
-            this.x, this.y, vx, vy,
-            skill.damage, this.team,
-            this.charData.color, 5, 'arrow'
-          );
-          proj.attacker = this;
-          weaponSystem.projectiles.push(proj);
-        }
-
-        effectSystem.addSkillEffect('multi_shot', this.x, this.y, this.charData.color, 30);
-        break;
-      }
-
-      // ── METEOR (Mage): AOE damage at target location ──
-      case 'meteor': {
-        const area = skill.area || 80;
-        effectSystem.addSkillEffect('meteor', this.target.x, this.target.y, this.charData.color, area);
-        effectSystem.screenShake(10);
-
-        const targetX = this.target.x;
-        const targetY = this.target.y;
-
-        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
-        if (opposingTeam) {
-          opposingTeam.forEach(enemy => {
-            if (enemy.isAlive()) {
-              const ex = enemy.x - targetX;
-              const ey = enemy.y - targetY;
-              const edist = Math.sqrt(ex * ex + ey * ey);
-              if (edist <= area) {
-                enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
-              }
-            }
-          });
-        }
-        break;
-      }
-
-      // ── BLAST BOMB (Bomber): Moderate area damage at target location ──
-      case 'bomb_toss': {
-        const area = skill.area || 90;
-        const targetX = this.target.x;
-        const targetY = this.target.y;
-
-        effectSystem.addSkillEffect('bomb', targetX, targetY, this.charData.color, area);
-        effectSystem.screenShake(7);
-
-        if (window.combatManager) {
-          window.combatManager.applyAreaDamage(targetX, targetY, this.team, skill.damage, area, this);
-        }
-        break;
-      }
-
-      // ── TOXIC FLASK (Poisoner): Light area damage plus slow ──
-      case 'poison_cloud': {
-        const area = skill.area || 100;
-        const targetX = this.target.x;
-        const targetY = this.target.y;
-
-        effectSystem.addSkillEffect('poison_cloud', targetX, targetY, this.charData.color, area);
-        effectSystem.screenShake(3);
-        if (window.combatManager) {
-          window.combatManager.addPoisonZone(targetX, targetY, this.team, area, skill.duration || 3.0, skill.poisonDps || 4.0, 1.2);
-        }
-
-        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
-        if (opposingTeam) {
-          opposingTeam.forEach(enemy => {
-            if (enemy.isAlive()) {
-              const ex = enemy.x - targetX;
-              const ey = enemy.y - targetY;
-              const edist = Math.sqrt(ex * ex + ey * ey);
-              if (edist <= area) {
-                enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
-                enemy.applyPoison(skill.duration || 3.0, skill.poisonDps || 4.0);
-                enemy.applySlow(1.2);
-              }
-            }
-          });
-        }
-        break;
-      }
-
-      // ── PIERCING THRUST (Spearman): Damage enemies in a forward line ──
-      case 'pierce': {
-        const range = skill.range || 150;
-        const width = skill.width || 34;
-        const dirX = dx / dist;
-        const dirY = dy / dist;
-        effectSystem.addSkillEffect('multi_shot', this.x, this.y, this.charData.color, 35);
-
-        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
-        if (opposingTeam) {
-          opposingTeam.forEach(enemy => {
-            if (!enemy.isAlive()) return;
-            const ex = enemy.x - this.x;
-            const ey = enemy.y - this.y;
-            const forward = ex * dirX + ey * dirY;
-            const side = Math.abs(ex * dirY - ey * dirX);
-            if (forward >= 0 && forward <= range && side <= width) {
-              enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
-              effectSystem.addHitEffect(enemy.x, enemy.y, this.charData.color);
-            }
-          });
-        }
-        break;
-      }
-
-      // ── FROST NOVA (Frost Apprentice): Large area slow ──
-      case 'frost_nova': {
-        const area = skill.area || 210;
-        effectSystem.addSkillEffect('slow', this.x, this.y, '#4FC3F7', area);
-        effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#B3E5FC', area);
-        effectSystem.screenShake(4);
-
-        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
-        if (opposingTeam) {
-          opposingTeam.forEach(enemy => {
-            if (!enemy.isAlive()) return;
-            const ex = enemy.x - this.x;
-            const ey = enemy.y - this.y;
-            const edist = Math.sqrt(ex * ex + ey * ey);
-            if (edist <= area) {
-              enemy.takeDamage(skill.damage, this.x, this.y, effectSystem);
-              enemy.applySlow(skill.duration || 3.0);
-              effectSystem.addSkillEffect('slow', enemy.x, enemy.y, '#4FC3F7', 36);
-            }
-          });
-        }
-        break;
-      }
-
-      // ── INFERNO DETONATION (Vulcan): Explode all burning enemies ──
-      case 'inferno_detonation': {
-        const area = skill.area || 115;
-        const opposingTeam = (this.team === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
-        if (opposingTeam) {
-          var burningTargets = opposingTeam.filter(enemy => enemy.isAlive() && enemy.burnTimer > 0);
-          if (burningTargets.length === 0 && this.target && this.target.isAlive()) {
-            this.target.applyBurn(skill.burnDuration || 3.5, skill.burnDps || 6);
-            burningTargets = [this.target];
-          }
-
-          burningTargets.forEach(burningEnemy => {
-            effectSystem.addSkillEffect('fire_burst', burningEnemy.x, burningEnemy.y, '#FF5722', area);
-            window.combatManager.applyAreaDamage(burningEnemy.x, burningEnemy.y, this.team, skill.damage, area, this);
-
-            opposingTeam.forEach(enemy => {
-              if (!enemy.isAlive()) return;
-              const ex = enemy.x - burningEnemy.x;
-              const ey = enemy.y - burningEnemy.y;
-              const edist = Math.sqrt(ex * ex + ey * ey);
-              if (isFinite(edist) && edist <= area) {
-                enemy.applyBurn(skill.burnDuration || 3.5, skill.burnDps || 6);
-              }
-            });
-          });
-        }
-        effectSystem.screenShake(12);
-        break;
-      }
-
-      // ── SHADOW DASH (Vampire): Smooth high speed slide ──
-      case 'dash': {
-        // Calculate destination (stop 30px away from target)
-        var dashDestX = this.x;
-        var dashDestY = this.y;
-        if (dist > 30) {
-          dashDestX = this.target.x - (dx / dist) * 30;
-          dashDestY = this.target.y - (dy / dist) * 30;
-        }
-
-        // Set up dashing_skill state
-        this.setState('dashing_skill');
-        this.dashStartX = this.x;
-        this.dashStartY = this.y;
-        this.dashTargetX = dashDestX;
-        this.dashTargetY = dashDestY;
-        this.dashDuration = 0.12; // 0.12 seconds dash duration (very fast, but smooth!)
-        this.dashTimer = 0;
-        this.dashSkillType = 'dash';
-
-        // Play skill starting effect
-        effectSystem.addSkillEffect('dash', this.x, this.y, this.charData.color, 20);
-        break;
-      }
-
-      // ── SHADOW CLONE (Ninja): Create clones that attack ──
-      case 'clone': {
-        this.clones = [
-          { x: this.x + 30, y: this.y - 20 },
-          { x: this.x - 30, y: this.y + 20 }
-        ];
-        this.cloneTimer = 3.0; // Clones last 3 seconds
-
-        effectSystem.addSkillEffect('clone', this.x, this.y, this.charData.color, 30);
-
-        // Each clone fires a shuriken at the target
-        for (var i = 0; i < this.clones.length; i++) {
-          weaponSystem.createRangedAttack(
-            this.clones[i].x, this.clones[i].y,
-            this.target.x, this.target.y,
-            skill.damage, this.team,
-            'shuriken', this.charData.color,
-            this
-          );
-        }
-        break;
-      }
-
-      // ── SHIELD BASH (Knight): Stun + damage ──
-      case 'stun': {
-        if (this.target.isAlive() && dist <= skill.range) {
-          this.target.takeDamage(skill.damage, this.x, this.y, effectSystem);
-          this.target.stunTimer = skill.duration; // Apply stun!
-          effectSystem.addSkillEffect('stun', this.target.x, this.target.y, '#FFD700', 30);
-          effectSystem.screenShake(6);
-        }
-        break;
-      }
-
-      // ── BACKSTAB (Assassin): Smooth high speed curve behind target ──
-      case 'backstab': {
-        // Calculate destination behind the target (opposite their facing angle)
-        var behindX = this.target.x - Math.cos(this.target.angle) * 30;
-        var behindY = this.target.y - Math.sin(this.target.angle) * 30;
-
-        // Set up dashing_skill state
-        this.setState('dashing_skill');
-        this.dashStartX = this.x;
-        this.dashStartY = this.y;
-        this.dashTargetX = behindX;
-        this.dashTargetY = behindY;
-        this.dashDuration = 0.15; // 0.15 seconds dash duration
-        this.dashTimer = 0;
-        this.dashSkillType = 'backstab';
-
-        // Play starting skill effect
-        effectSystem.addSkillEffect('backstab', this.x, this.y, this.charData.color, 20);
-        break;
-      }
-
-      // ── BANANA PEEL (Minion): Slow debuff + ranged damage ──
-      case 'slow': {
-        weaponSystem.createRangedAttack(
-          this.x, this.y,
-          this.target.x, this.target.y,
-          skill.damage, this.team,
-          'banana', this.charData.color,
-          this
-        );
-
-        if (this.target.isAlive() && dist <= skill.range) {
-          this.target.slowTimer = skill.duration; // Apply slow!
-          effectSystem.addSkillEffect('slow', this.target.x, this.target.y, '#42A5F5', 40);
-        }
-        break;
-      }
-
-      // ── SERIOUS PUNCH (Saitama): Smooth super fast lunge ──
-      case 'serious_punch': {
-        // Calculate destination (stop 20px away from target)
-        var dashDestX = this.x;
-        var dashDestY = this.y;
-        if (dist > 20) {
-          dashDestX = this.target.x - (dx / dist) * 20;
-          dashDestY = this.target.y - (dy / dist) * 20;
-        }
-
-        this.setState('dashing_skill');
-        this.dashStartX = this.x;
-        this.dashStartY = this.y;
-        this.dashTargetX = dashDestX;
-        this.dashTargetY = dashDestY;
-        this.dashDuration = 0.08; // Very fast lunge!
-        this.dashTimer = 0;
-        this.dashSkillType = 'serious_punch';
-
-        effectSystem.addSkillEffect('dash', this.x, this.y, this.charData.color, 30);
-        break;
-      }
-
-      // ── SUMMON BATS (Blood Demon): Summons 4 homing siphoning bats ──
-      case 'summon_bats': {
-        var baseAngle = Math.atan2(dy, dx);
-        var spread = Math.PI / 3; // 60 degrees spread
-        var numBats = 4;
-        for (var i = 0; i < numBats; i++) {
-          var angleOffset = (i - (numBats - 1) / 2) * (spread / (numBats - 1));
-          var batAngle = baseAngle + angleOffset;
-          var speed = 250; // Homing will guide them
-          var vx = Math.cos(batAngle) * speed;
-          var vy = Math.sin(batAngle) * speed;
-          
-          var batProj = new Projectile(
-            this.x, this.y, vx, vy,
-            skill.damage, this.team,
-            '#FF1744', 8, 'bat'
-          );
-          batProj.attacker = this;
-          weaponSystem.projectiles.push(batProj);
-        }
-        effectSystem.addSkillEffect('clone', this.x, this.y, '#FF1744', 40);
-        effectSystem.screenShake(4);
-        break;
-      }
-
-      // ── TRAIN STAMPEDE (Train Conductor): Summons linear stun train ──
-      case 'train_stampede': {
-        var baseAngle = Math.atan2(dy, dx);
-        var speed = 300;
-        var vx = Math.cos(baseAngle) * speed;
-        var vy = Math.sin(baseAngle) * speed;
-
-        var proj = weaponSystem.createRangedAttack(
-          this.x, this.y,
-          this.target.x, this.target.y,
-          skill.damage, this.team,
-          'train', this.charData.color,
-          this
-        );
-
-        effectSystem.screenShake(5);
-        effectSystem.addSkillEffect('multi_shot', this.x, this.y, this.charData.color, 40);
-        break;
-      }
-
-      // ── SUMMON LEGION (Superhero Summoner): Summons 3 Stone Golems ──
-      case 'summon_legion': {
-        const teamArr = this.team === 'left' ? window.combatManager.fightersLeft : window.combatManager.fightersRight;
-        if (teamArr) {
-          for (var i = 0; i < 3; i++) {
-            var spawnX = this.x + (Math.random() - 0.5) * 80;
-            var spawnY = this.y + (Math.random() - 0.5) * 80;
-            var minion = new Fighter('summoned_golem', spawnX, spawnY, this.team);
-            teamArr.push(minion);
-            effectSystem.addSkillEffect('clone', spawnX, spawnY, '#E040FB', 40);
-          }
-          if (window.soundSystem) window.soundSystem.playSummonSound();
-        }
-        effectSystem.screenShake(8);
-        effectSystem.addSkillEffect('meteor', this.x, this.y, '#9C27B0', 60);
-        break;
-      }
-    }
+    executeSkillStrategy(this, skill, weaponSystem, effectSystem);
   }
 
   // ═══════════════════════════════════════════════════════════════

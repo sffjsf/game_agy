@@ -5,7 +5,7 @@
  * No modules/imports - loaded via script tag.
  */
 
-class EffectSystem {
+export class EffectSystem {
   constructor() {
     /** @type {Array} Active particle effects */
     this.particles = [];

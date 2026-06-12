@@ -1,8 +1,12 @@
+import { Fighter } from './fighter.js';
+import { WeaponSystem } from './weapon.js';
+import { EffectSystem } from './effects.js';
+
 /**
  * CombatManager - Orchestrates the entire battle
  * Manages fighters, weapon/effect systems, arena, countdown, and battle state.
  */
-class CombatManager {
+export class CombatManager {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
@@ -62,6 +66,7 @@ class CombatManager {
     for (let i = 0; i < numLeft; i++) {
       const y = startYLeft + i * spacing;
       const f = new Fighter(leftIds[i], spawnXLeft, y, 'left');
+      f.combatManager = this;
       this.fightersLeft.push(f);
     }
 
@@ -71,6 +76,7 @@ class CombatManager {
     for (let i = 0; i < numRight; i++) {
       const y = startYRight + i * spacing;
       const f = new Fighter(rightIds[i], spawnXRight, y, 'right');
+      f.combatManager = this;
       this.fightersRight.push(f);
     }
 

@@ -1,4 +1,4 @@
-class SoundSystem {
+export class SoundSystem {
   constructor() {
     this.ctx = null;
     this.enabled = true;
@@ -135,5 +135,5 @@ class SoundSystem {
   }
 }
 
-// Global instance
-window.soundSystem = new SoundSystem();
+// Export a singleton instance
+export const soundSystem = new SoundSystem();

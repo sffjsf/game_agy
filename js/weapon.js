@@ -10,7 +10,7 @@
 // PROJECTILE CLASS
 // ═══════════════════════════════════════════════════════════════
 
-class Projectile {
+export class Projectile {
   /**
    * Create a new projectile.
    * @param {number} x - Start X position
@@ -50,8 +50,8 @@ class Projectile {
 
     // Homing logic for bat projectile and homing_orb
     if (this.type === 'bat' || this.type === 'homing_orb') {
-      if (window.combatManager) {
-        var opposingTeam = (this.ownerId === 'left') ? window.combatManager.fightersRight : window.combatManager.fightersLeft;
+      if (this.attacker.combatManager) {
+        var opposingTeam = (this.ownerId === 'left') ? this.attacker.combatManager.fightersRight : this.attacker.combatManager.fightersLeft;
         if (opposingTeam) {
           var target = null;
           var minDist = Infinity;
@@ -580,7 +580,7 @@ class Projectile {
 // WEAPON SYSTEM CLASS
 // ═══════════════════════════════════════════════════════════════
 
-class WeaponSystem {
+export class WeaponSystem {
   constructor() {
     /** @type {Projectile[]} Active projectiles */
     this.projectiles = [];

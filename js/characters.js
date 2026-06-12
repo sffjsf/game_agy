@@ -6,7 +6,7 @@
  * No modules/imports - loaded via script tag.
  */
 
-const CHARACTERS = {
+export const characterData = {
 
   // ═══════════════════════════════════════════════════════════════
   // 1. SWORDSMAN (剑士) - Melee, Aggressive, Linear movement

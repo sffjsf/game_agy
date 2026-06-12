@@ -1,8 +1,11 @@
+import { characterData } from './characters.js';
+import { soundSystem } from './audio.js';
+
 /**
  * UIManager - Manages all HTML-based UI overlays
  * Character selection, battle HUD, countdown, and result screen.
  */
-class UIManager {
+export class UIManager {
   constructor() {
     // ── Screens ──
     this.selectScreen = document.getElementById('select-screen');
@@ -54,10 +57,10 @@ class UIManager {
     this.leftGrid.innerHTML = '';
     this.rightGrid.innerHTML = '';
 
-    const charIds = Object.keys(CHARACTERS);
+    const charIds = Object.keys(characterData);
 
     charIds.forEach(id => {
-      const char = CHARACTERS[id];
+      const char = characterData[id];
       if (char.hidden) return; // Hide summoned minions from selection
       this.leftGrid.appendChild(this._createCard(id, char, 'left'));
       this.rightGrid.appendChild(this._createCard(id, char, 'right'));
@@ -137,7 +140,7 @@ class UIManager {
     grid.querySelectorAll('.character-card').forEach(card => {
       const charId = card.dataset.charId;
       const index = list.indexOf(charId);
-      const char = CHARACTERS[charId];
+      const char = characterData[charId];
 
       if (index > -1) {
         card.classList.add('selected');
@@ -320,7 +323,7 @@ class UIManager {
      ═══════════════════════════════════════════════════════ */
 
   showResult(winnerSide, battleTime) {
-    if (window.soundSystem) window.soundSystem.playVictorySound();
+    if (soundSystem) soundSystem.playVictorySound();
     
     if (winnerSide) {
       this.resultTitle.textContent = '🏆 胜利!';
@@ -371,9 +374,9 @@ class UIManager {
 
   _setupEventListeners() {
     this.startBtn.addEventListener('click', () => {
-      if (window.soundSystem) {
-        window.soundSystem.init();
-        window.soundSystem.playStartBattleSound();
+      if (soundSystem) {
+        soundSystem.init();
+        soundSystem.playStartBattleSound();
       }
       if (this.selectedLeft && this.selectedRight && this._onStartBattle) {
         this._onStartBattle(this.selectedLeft, this.selectedRight);
@@ -381,17 +384,17 @@ class UIManager {
     });
 
     this.rematchBtn.addEventListener('click', () => {
-      if (window.soundSystem) {
-        window.soundSystem.init();
-        window.soundSystem.playClickSound();
+      if (soundSystem) {
+        soundSystem.init();
+        soundSystem.playClickSound();
       }
       if (this._onRematch) this._onRematch();
     });
 
     this.reselectBtn.addEventListener('click', () => {
-      if (window.soundSystem) {
-        window.soundSystem.init();
-        window.soundSystem.playClickSound();
+      if (soundSystem) {
+        soundSystem.init();
+        soundSystem.playClickSound();
       }
       if (this._onReselect) this._onReselect();
     });
@@ -400,9 +403,9 @@ class UIManager {
     const closeCodexBtn = document.getElementById('close-codex-btn');
     if (openCodexBtn) {
       openCodexBtn.addEventListener('click', () => {
-        if (window.soundSystem) {
-          window.soundSystem.init();
-          window.soundSystem.playClickSound();
+        if (soundSystem) {
+          soundSystem.init();
+          soundSystem.playClickSound();
         }
         this._populateCodex();
         this.showScreen('codex');
@@ -410,7 +413,7 @@ class UIManager {
     }
     if (closeCodexBtn) {
       closeCodexBtn.addEventListener('click', () => {
-        if (window.soundSystem) window.soundSystem.playClickSound();
+        if (soundSystem) soundSystem.playClickSound();
         this.showScreen('select');
       });
     }
@@ -442,9 +445,9 @@ class UIManager {
     if (!codexGrid) return;
     codexGrid.innerHTML = '';
 
-    const charIds = Object.keys(CHARACTERS);
+    const charIds = Object.keys(characterData);
     charIds.forEach(id => {
-      const char = CHARACTERS[id];
+      const char = characterData[id];
       // Only show visible characters in codex (unless we want to show hidden minions too? Let's show all to be fully detailed)
       const isHidden = char.hidden ? '<span style="color: #ff5252; font-size: 0.8em; margin-left: 8px;">(隐藏角色)</span>' : '';
 
