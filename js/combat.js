@@ -1,3 +1,4 @@
+import * as EffectLib from './effects_lib/index.js';
 import { Fighter } from './fighter.js';
 import { WeaponSystem } from './weapon.js';
 import { EffectSystem } from './effects.js';
@@ -171,12 +172,12 @@ export class CombatManager {
 
     if (attacker && attacker.hasPassive && attacker.hasPassive('train_stun') && projectile.type === 'train') {
       hit.target.applyStun(1.8);
-      this.effectSystem.addSkillEffect('stun', hit.target.x, hit.target.y, '#FFD700', 30);
+      EffectLib.addStunEffect(this.effectSystem, hit.target.x, hit.target.y, '#FFD700', 30);
     }
 
     if (projectile.type === 'bomb') {
       this.applyAreaDamage(projectile.x, projectile.y, projectile.ownerId, hit.damage, 105, attacker);
-      this.effectSystem.addSkillEffect('bomb', projectile.x, projectile.y, projectile.color, 105);
+      EffectLib.addBombEffect(this.effectSystem, projectile.x, projectile.y, projectile.color, 105);
       this.effectSystem.screenShake(6);
       return;
     }
@@ -184,7 +185,7 @@ export class CombatManager {
     if (projectile.type === 'poison') {
       hit.target.applyPoison(3.0, 3.5);
       hit.target.applySlow(1.2);
-      this.effectSystem.addSkillEffect('poison_cloud', hit.target.x, hit.target.y, projectile.color, 55);
+      EffectLib.addPoisonCloudEffect(this.effectSystem, hit.target.x, hit.target.y, projectile.color, 55);
     }
 
     if (!attacker || !attacker.isAlive()) return;

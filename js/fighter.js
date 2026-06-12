@@ -1,5 +1,8 @@
+import * as EffectLib from './effects_lib/index.js';
+import * as Passives from './skills/Passives.js';
+import { FighterAI } from './ai/FighterAI.js';
 import { executeSkillStrategy } from './skills/SkillRegistry.js';
-import { characterData } from './characters.js';
+import { characterData } from './characters/index.js';
 import { soundSystem } from './audio.js';
 
 /**
@@ -98,6 +101,7 @@ export class Fighter {
 
     // Reference to enemy target (set externally)
     this.target = null;
+    this.ai = new FighterAI(this);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -119,51 +123,8 @@ export class Fighter {
    * Does not change target mid-attack/skill to avoid animation jitter.
    * @param {Fighter[]} opposingTeam
    */
-  findClosestTarget(opposingTeam) {
-    if (!opposingTeam || opposingTeam.length === 0) {
-      this.target = null;
-      return;
-    }
+  // Extracted to FighterAI: findClosestTarget
 
-    // If current target is alive and we are already committed to an attack/skill, keep it
-    if (this.target && this.target.isAlive() && 
-        (this.state === 'charge' || this.state === 'attack' || this.state === 'skill' || this.state === 'dashing_skill')) {
-      return;
-    }
-
-    let closest = null;
-    let minDist = Infinity;
-
-    let currentTargetDist = Infinity;
-    if (this.target && this.target.isAlive()) {
-      const dx = this.target.x - this.x;
-      const dy = this.target.y - this.y;
-      currentTargetDist = Math.sqrt(dx * dx + dy * dy);
-    }
-
-    for (let i = 0; i < opposingTeam.length; i++) {
-      const enemy = opposingTeam[i];
-      if (enemy.isAlive()) {
-        const dx = enemy.x - this.x;
-        const dy = enemy.y - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < minDist) {
-          minDist = dist;
-          closest = enemy;
-        }
-      }
-    }
-
-    // Hysteresis: only switch targets if the new closest is significantly closer
-    // (e.g. 25 pixels) than the current target. This prevents rapid spinning/trembling.
-    if (this.target && this.target.isAlive()) {
-      if (closest !== this.target && minDist < currentTargetDist - 25) {
-        this.target = closest;
-      }
-    } else {
-      this.target = closest;
-    }
-  }
 
   /**
    * Set the enemy target for this fighter.
@@ -239,7 +200,7 @@ export class Fighter {
     if (!this.alive && this.state !== 'dead') return;
 
     // Find closest target dynamically
-    this.findClosestTarget(opposingTeam);
+    this.ai.findClosestTarget(opposingTeam);
 
     // ── Update all timers ──
     this.stateTimer += dt;
@@ -286,9 +247,6 @@ export class Fighter {
     // Skills have absolute priority: cast immediately once ready and in range.
     if (this.canCastSkillNow()) {
       this.setState('skill');
-    } else if (this.skillReady && this.target && this.target.isAlive() &&
-        this.state !== 'skill' && this.state !== 'dashing_skill' && this.state !== 'dead') {
-      this.setState('chase');
     }
 
     // ── State machine ──
@@ -324,8 +282,10 @@ export class Fighter {
         }
 
         if (dist <= this.charData.attackRange && this.attackTimer <= 0) {
-          // Normal attack (blocked if skill is ready and in range, ensuring absolute skill priority)
-          if (!(this.skillReady && dist <= this.charData.skill.range)) {
+          // Hold normal attack if skill is ready but out of range, so we can walk closer!
+          var holdAttackForSkill = this.skillReady && this.charData.skill && dist > this.charData.skill.range;
+          
+          if (!holdAttackForSkill) {
             this.setState('charge');
             break;
           }
@@ -336,10 +296,10 @@ export class Fighter {
           if (this.repositionType === 'waypoint') {
             this.repositionType = Math.random() < 0.65 ? 'circle' : 'retreat';
           }
-          this.applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem);
+          this.ai.applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem);
         } else {
           // Apply standard movement pattern
-          this.applyMovement(dt, arenaWidth, arenaHeight, effectSystem);
+          this.ai.applyMovement(dt, arenaWidth, arenaHeight, effectSystem);
         }
 
         // Apply AI behavior modifications
@@ -357,7 +317,7 @@ export class Fighter {
 
         // Melee units continue chasing at 80% speed during charge to stay close to moving enemies
         if (this.charData.weaponType === 'melee') {
-          this.applyMovement(dt * 0.8, arenaWidth, arenaHeight, effectSystem);
+          this.ai.applyMovement(dt * 0.8, arenaWidth, arenaHeight, effectSystem);
         }
 
         // When charge time is reached, execute attack
@@ -389,11 +349,11 @@ export class Fighter {
       // ───────────────────────────────────────────────
       case 'cooldown':
         // Move during cooldown!
-        this.applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem);
+        this.ai.applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem);
         if (this.stateTimer >= this.charData.attackSpeed * 0.3) {
           // 85% chance to perform an extended tactical reposition, otherwise chase
           if (Math.random() < 0.85) {
-            this.startReposition(arenaWidth, arenaHeight, arenaX, arenaY);
+            this.ai.startReposition(arenaWidth, arenaHeight, arenaX, arenaY);
           } else {
             this.setState('chase');
           }
@@ -411,7 +371,7 @@ export class Fighter {
         // Skill animation time
         if (this.stateTimer >= 0.5) {
           // Reposition to back away or flank after a skill
-          this.startReposition(arenaWidth, arenaHeight, arenaX, arenaY);
+          this.ai.startReposition(arenaWidth, arenaHeight, arenaX, arenaY);
         }
         break;
 
@@ -424,7 +384,7 @@ export class Fighter {
           break;
         }
 
-        this.applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem);
+        this.ai.applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem);
 
         // Reposition for a short time, then resume chasing
         if (this.stateTimer >= this.repositionDuration) {
@@ -589,28 +549,7 @@ export class Fighter {
    * @param {EffectSystem} effectSystem
    */
   applyMeleeHitPassives(damage, primaryTarget, effectSystem) {
-    if (this.hasPassive('saitama_splash')) {
-      effectSystem.addSkillEffect('meteor', primaryTarget.x, primaryTarget.y, '#FFD700', 70);
-      effectSystem.screenShake(5);
-
-      const opposingTeam = (this.team === 'left') ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
-      if (opposingTeam) {
-        opposingTeam.forEach(enemy => {
-          if (!enemy.isAlive() || enemy === primaryTarget) return;
-
-          const ex = enemy.x - primaryTarget.x;
-          const ey = enemy.y - primaryTarget.y;
-          const edist = Math.sqrt(ex * ex + ey * ey);
-          if (edist <= 70) {
-            enemy.takeDamage(damage * 0.5, this.x, this.y, effectSystem);
-          }
-        });
-      }
-    }
-
-    if (this.hasPassive('spear_pierce')) {
-      this.applyPiercingLineDamage(damage * 0.55, this.charData.attackRange * 1.7, 28, primaryTarget, effectSystem);
-    }
+    return Passives.applyMeleeHitPassives(this, damage, primaryTarget, effectSystem);
   }
 
   /**
@@ -622,23 +561,7 @@ export class Fighter {
    * @param {EffectSystem} effectSystem
    */
   applyPiercingLineDamage(damage, range, width, primaryTarget, effectSystem) {
-    const opposingTeam = (this.team === 'left') ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
-    if (!opposingTeam) return;
-
-    var dirX = Math.cos(this.angle);
-    var dirY = Math.sin(this.angle);
-    opposingTeam.forEach(enemy => {
-      if (!enemy.isAlive() || enemy === primaryTarget) return;
-
-      const ex = enemy.x - this.x;
-      const ey = enemy.y - this.y;
-      const forward = ex * dirX + ey * dirY;
-      const side = Math.abs(ex * dirY - ey * dirX);
-      if (forward >= 0 && forward <= range && side <= width) {
-        enemy.takeDamage(damage, this.x, this.y, effectSystem);
-        effectSystem.addHitEffect(enemy.x, enemy.y, this.charData.color);
-      }
-    });
+    return Passives.applyPiercingLineDamage(this, damage, range, width, primaryTarget, effectSystem);
   }
 
   /**
@@ -646,16 +569,7 @@ export class Fighter {
    * @param {EffectSystem} effectSystem
    */
   performSummonerBasicAttack(effectSystem) {
-    const teamArr = this.team === 'left' ? this.combatManager.fightersLeft : this.combatManager.fightersRight;
-    if (!teamArr) return;
-
-    var spawnX = this.x + (Math.random() - 0.5) * 60;
-    var spawnY = this.y + (Math.random() - 0.5) * 60;
-    var minion = new Fighter('summoned_golem', spawnX, spawnY, this.team);
-    minion.combatManager = this.combatManager;
-    teamArr.push(minion);
-    effectSystem.addSkillEffect('clone', spawnX, spawnY, '#E040FB', 30);
-    if (soundSystem) soundSystem.playSummonSound();
+    return Passives.performSummonerBasicAttack(this, effectSystem);
   }
 
   /**
@@ -663,37 +577,7 @@ export class Fighter {
    * @param {EffectSystem} effectSystem
    */
   executeFireConeAttack(effectSystem) {
-    if (!this.combatManager) return;
-
-    const range = this.charData.attackRange || 190;
-    const coneHalfAngle = Math.PI / 4;
-    const opposingTeam = this.team === 'left' ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
-    if (!opposingTeam) return;
-
-    if (effectSystem.addFireCone) {
-      effectSystem.addFireCone(this.x, this.y, this.angle, '#FF5722', range);
-    } else {
-      effectSystem.addSkillEffect('fire_cone', this.x, this.y, '#FF5722', range);
-    }
-    effectSystem.screenShake(3);
-
-    opposingTeam.forEach(enemy => {
-      if (!enemy.isAlive()) return;
-
-      const dx = enemy.x - this.x;
-      const dy = enemy.y - this.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (!isFinite(dist) || dist > range) return;
-
-      var angleDiff = Math.atan2(dy, dx) - this.angle;
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      if (Math.abs(angleDiff) <= coneHalfAngle) {
-        enemy.takeDamage(this.charData.attackPower, this.x, this.y, effectSystem);
-        enemy.applyBurn(4.0, 6.0);
-        effectSystem.addHitEffect(enemy.x, enemy.y, '#FFAB00');
-      }
-    });
+    return Passives.executeFireConeAttack(this, effectSystem);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -708,223 +592,14 @@ export class Fighter {
    * @param {number} arenaHeight - Arena height
    * @param {EffectSystem} effectSystem - For blink trail effects
    */
-  applyMovement(dt, arenaWidth, arenaHeight, effectSystem) {
-    if (!this.target || !this.target.isAlive()) return;
+  // Extracted to FighterAI: applyMovement
 
-    // Convert speed: charData.speed is px/frame at 60fps → px/sec = speed * 60
-    var baseSpeed = this.charData.speed * 60;
-    var moveSpeed = baseSpeed * dt * (this.slowTimer > 0 ? 0.5 : 1.0);
-
-    var dx = this.target.x - this.x;
-    var dy = this.target.y - this.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
-      dx = 0;
-      dy = 0;
-      dist = 1;
-    }
-
-    switch (this.charData.movePattern) {
-
-      // ── LINEAR: Direct approach ──
-      case 'linear':
-        this.x += (dx / dist) * moveSpeed;
-        this.y += (dy / dist) * moveSpeed;
-        break;
-
-      // ── KEEP DISTANCE: Maintain ideal range ──
-      case 'keepDistance': {
-        var idealDist = this.charData.attackRange * 0.7;
-
-        if (dist < idealDist - 20) {
-          // Too close → move away
-          this.x -= (dx / dist) * moveSpeed;
-          this.y -= (dy / dist) * moveSpeed;
-        } else if (dist > idealDist + 20) {
-          // Too far → move closer
-          this.x += (dx / dist) * moveSpeed;
-          this.y += (dy / dist) * moveSpeed;
-        }
-
-        // Add perpendicular drift to avoid being stationary
-        var perpX = -dy / dist;
-        var perpY = dx / dist;
-        this.x += perpX * moveSpeed * 0.3;
-        this.y += perpY * moveSpeed * 0.3;
-        break;
-      }
-
-      // ── ARC: Orbit around target ──
-      case 'arc': {
-        this.flankAngle += dt * 1.5;
-        var idealDist = this.charData.attackRange * 0.8;
-
-        // Target orbit position
-        var orbitX = this.target.x + Math.cos(this.flankAngle) * idealDist;
-        var orbitY = this.target.y + Math.sin(this.flankAngle) * idealDist;
-
-        // Move toward orbit position
-        var toDx = orbitX - this.x;
-        var toDy = orbitY - this.y;
-        var toDist = Math.sqrt(toDx * toDx + toDy * toDy);
-        if (!isFinite(toDx) || !isFinite(toDy) || !isFinite(toDist) || toDist < 1) {
-          toDx = 0;
-          toDy = 0;
-          toDist = 1;
-        }
-        this.x += (toDx / toDist) * moveSpeed;
-        this.y += (toDy / toDist) * moveSpeed;
-        break;
-      }
-
-      // ── DASH: Normal movement + periodic high-speed slide ──
-      case 'dash': {
-        // Handle active short dash movement
-        if (this.shortDashTimer > 0) {
-          this.shortDashTimer -= dt;
-          if (isFinite(this.shortDashVx) && isFinite(this.shortDashVy)) {
-            this.x += this.shortDashVx * dt;
-            this.y += this.shortDashVy * dt;
-          }
-          
-          if (effectSystem && Math.random() < 0.4) {
-            effectSystem.addTrail(this.x, this.y, this.charData.color + '60', 3);
-          }
-          break;
-        }
-
-        // Normal approach
-        this.x += (dx / dist) * moveSpeed;
-        this.y += (dy / dist) * moveSpeed;
-
-        // Trigger a smooth high-speed glide
-        if (this.blinkCooldown <= 0 && dist > 70) {
-          // Slide 90-120px towards target over 0.15s
-          var dashDist = 90 + Math.random() * 30;
-          this.shortDashTimer = 0.15;
-          this.shortDashVx = (dx / dist) * (dashDist / 0.15);
-          this.shortDashVy = (dy / dist) * (dashDist / 0.15);
-
-          // Reset dash cooldown
-          this.blinkCooldown = 2.0 + Math.random() * 1.5;
-        }
-        break;
-      }
-
-      // ── ZIGZAG: Alternating perpendicular movement ──
-      case 'zigzag': {
-        this.moveTimer += dt;
-        if (this.moveTimer >= 0.4) {
-          this.zigzagDir *= -1;
-          this.moveTimer = 0;
-        }
-
-        // Forward direction
-        var fx = dx / dist;
-        var fy = dy / dist;
-
-        // Perpendicular direction
-        var px = -fy;
-        var py = fx;
-
-        this.x += (fx + px * this.zigzagDir * 0.7) * moveSpeed;
-        this.y += (fy + py * this.zigzagDir * 0.7) * moveSpeed;
-        break;
-      }
-
-      // ── FLANK: Move to target's back ──
-      case 'flank': {
-        // Position behind the enemy (opposite their facing angle)
-        var behindX = this.target.x - Math.cos(this.target.angle) * 60;
-        var behindY = this.target.y - Math.sin(this.target.angle) * 60;
-
-        var fDx = behindX - this.x;
-        var fDy = behindY - this.y;
-        var fDist = Math.sqrt(fDx * fDx + fDy * fDy);
-
-        if (!isFinite(fDx) || !isFinite(fDy) || !isFinite(fDist) || fDist < 1) {
-          fDx = 0;
-          fDy = 0;
-          fDist = 1;
-        }
-        this.x += (fDx / fDist) * moveSpeed;
-        this.y += (fDy / fDist) * moveSpeed;
-        break;
-      }
-
-      // ── WOBBLE: Unpredictable wobbly path ──
-      case 'wobble': {
-        this.wobbleAngle += dt * 8;
-
-        var wobbleX = Math.cos(this.wobbleAngle) * moveSpeed * 0.5;
-        var wobbleY = Math.sin(this.wobbleAngle * 1.3) * moveSpeed * 0.5;
-
-        this.x += (dx / dist) * moveSpeed * 0.7 + wobbleX;
-        this.y += (dy / dist) * moveSpeed * 0.7 + wobbleY;
-        break;
-      }
-    }
-  }
 
   /**
    * Enter the reposition state, choosing a duration and strategy (retreat/circle).
    */
-  startReposition(arenaWidth, arenaHeight, arenaX, arenaY) {
-    this.setState('reposition');
-    // Reposition duration is longer for full map movements (e.g. 2.0s to 3.5s)
-    this.repositionDuration = 2.0 + Math.random() * 1.5;
+  // Extracted to FighterAI: startReposition
 
-    arenaX = arenaX || 20;
-    arenaY = arenaY || 10;
-    arenaWidth = arenaWidth || 800;
-    arenaHeight = arenaHeight || 500;
-
-    if (this.charData.weaponType === 'ranged') {
-      this.repositionType = 'waypoint';
-
-      // Pick the furthest waypoint from the enemy
-      if (this.target && this.target.isAlive()) {
-        const enemyX = this.target.x;
-        const enemyY = this.target.y;
-
-        // 8 Candidate waypoints (corners & midpoints of arena boundaries)
-        const candidates = [
-          { x: arenaX + 40, y: arenaY + 40 }, // Top Left
-          { x: arenaX + arenaWidth - 40, y: arenaY + 40 }, // Top Right
-          { x: arenaX + arenaWidth - 40, y: arenaY + arenaHeight - 40 }, // Bottom Right
-          { x: arenaX + 40, y: arenaY + arenaHeight - 40 }, // Bottom Left
-          { x: arenaX + arenaWidth / 2, y: arenaY + 40 }, // Top Mid
-          { x: arenaX + arenaWidth / 2, y: arenaY + arenaHeight - 40 }, // Bottom Mid
-          { x: arenaX + 40, y: arenaY + arenaHeight / 2 }, // Left Mid
-          { x: arenaX + arenaWidth - 40, y: arenaY + arenaHeight / 2 } // Right Mid
-        ];
-
-        let maxDist = -1;
-        let bestPoint = candidates[0];
-
-        for (const pt of candidates) {
-          const dx = pt.x - enemyX;
-          const dy = pt.y - enemyY;
-          const dist = dx * dx + dy * dy;
-          if (dist > maxDist) {
-            maxDist = dist;
-            bestPoint = pt;
-          }
-        }
-
-        this.repositionWaypointX = bestPoint.x;
-        this.repositionWaypointY = bestPoint.y;
-      } else {
-        // Fallback: random corner
-        this.repositionWaypointX = arenaX + (Math.random() < 0.5 ? 40 : arenaWidth - 40);
-        this.repositionWaypointY = arenaY + (Math.random() < 0.5 ? 40 : arenaHeight - 40);
-      }
-    } else {
-      // Melee units circle 70% of the time with a WIDE radius, retreat 30% of the time
-      this.repositionType = Math.random() < 0.7 ? 'circle' : 'retreat';
-      this.circleDir = Math.random() < 0.5 ? 1 : -1;
-    }
-  }
 
   /**
    * Move using a repositioning pattern (retreat, circle, or waypoint kiting).
@@ -933,78 +608,8 @@ export class Fighter {
    * @param {number} arenaHeight - Arena height
    * @param {EffectSystem} effectSystem - For particle trails
    */
-  applyRepositionMovement(dt, arenaWidth, arenaHeight, effectSystem) {
-    if (!this.target || !this.target.isAlive()) return;
+  // Extracted to FighterAI: applyRepositionMovement
 
-    var baseSpeed = this.charData.speed * 60;
-    var moveSpeed = baseSpeed * dt * (this.slowTimer > 0 ? 0.5 : 1.0);
-
-    var dx = this.target.x - this.x;
-    var dy = this.target.y - this.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
-      dx = 0;
-      dy = 0;
-      dist = 1;
-    }
-
-    if (this.repositionType === 'waypoint') {
-      // Move towards the designated waypoint (full-map kiting)
-      var wpDx = this.repositionWaypointX - this.x;
-      var wpDy = this.repositionWaypointY - this.y;
-      var wpDist = Math.sqrt(wpDx * wpDx + wpDy * wpDy);
-
-      if (!isFinite(wpDx) || !isFinite(wpDy) || !isFinite(wpDist) || wpDist < 1) {
-        wpDx = 0;
-        wpDy = 0;
-        wpDist = 1;
-      }
-
-      if (wpDist > 10) {
-        this.x += (wpDx / wpDist) * moveSpeed;
-        this.y += (wpDy / wpDist) * moveSpeed;
-      } else {
-        // Arrived at waypoint, default to circling target
-        this.repositionType = 'circle';
-        this.circleDir = Math.random() < 0.5 ? 1 : -1;
-      }
-
-      // Speed trail effect while running across the map
-      if (effectSystem && Math.random() < 0.25) {
-        effectSystem.addTrail(this.x, this.y, this.charData.color + '30', 2.5);
-      }
-    } else if (this.repositionType === 'retreat') {
-      // Move directly away from target
-      this.x -= (dx / dist) * moveSpeed;
-      this.y -= (dy / dist) * moveSpeed;
-
-      // Visual representation (dust particles on backing off)
-      if (Math.random() < 0.1 && effectSystem) {
-        effectSystem.addTrail(this.x, this.y, 'rgba(255,255,255,0.15)', 2);
-      }
-    } else if (this.repositionType === 'circle') {
-      // Tangent direction for circling
-      var tx = -dy / dist;
-      var ty = dx / dist;
-
-      // WIDE circling: radius is 220px - 300px depending on their base range
-      var idealDist = Math.max(220, this.charData.attackRange * 1.5);
-      var radialPush = 0;
-      if (dist < idealDist) {
-        radialPush = -0.3; // Push outward slightly
-      } else if (dist > idealDist + 20) {
-        radialPush = 0.3; // Pull inward slightly
-      }
-
-      this.x += (tx * this.circleDir + (dx / dist) * radialPush) * moveSpeed;
-      this.y += (ty * this.circleDir + (dy / dist) * radialPush) * moveSpeed;
-
-      // Visual trail
-      if (Math.random() < 0.08 && effectSystem) {
-        effectSystem.addTrail(this.x, this.y, this.charData.color + '40', 3);
-      }
-    }
-  }
 
   // ═══════════════════════════════════════════════════════════════
   // AI DECISION MAKING
@@ -1133,7 +738,7 @@ export class Fighter {
     if (this.poisonTickTimer <= 0) {
       this.poisonTickTimer = 0.5;
       effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 12, '中毒!', false, '#9C27B0');
-      effectSystem.addSkillEffect('poison_cloud', this.x, this.y, '#9C27B0', 28);
+      EffectLib.addPoisonCloudEffect(effectSystem, this.x, this.y, '#9C27B0', 28);
     }
 
     if (this.poisonTimer <= 0) {
@@ -1155,7 +760,7 @@ export class Fighter {
       this.burnTickTimer = 0.5;
       this.takeDamage(this.burnDps * 0.5, this.x, this.y, effectSystem);
       effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 16, '着火', false, '#FFAB00');
-      effectSystem.addSkillEffect('fire_burst', this.x, this.y, '#FF5722', 24);
+      EffectLib.addFireBurstEffect(effectSystem, this.x, this.y, '#FF5722', 24);
     }
 
     if (this.burnTimer <= 0) {
@@ -1178,7 +783,7 @@ export class Fighter {
 
     this.poisonTrailTimer = 0.85;
     this.combatManager.addPoisonZone(this.x, this.y, this.team, 56, 3.2, 3.0, 0.8);
-    effectSystem.addSkillEffect('poison_cloud', this.x, this.y, '#66BB6A', 42);
+    EffectLib.addPoisonCloudEffect(effectSystem, this.x, this.y, '#66BB6A', 42);
   }
 
   /**
@@ -1198,43 +803,7 @@ export class Fighter {
    * @param {EffectSystem} effectSystem
    */
   trySteamWhistle(opposingTeam, effectSystem) {
-    if (!opposingTeam || this.stunTimer > 0 || this.whistleCooldown > 0) return;
-
-    var triggered = false;
-    opposingTeam.forEach(enemy => {
-      if (!enemy.isAlive()) return;
-
-      if (!isFinite(this.x)) this.x = 400;
-      if (!isFinite(this.y)) this.y = 300;
-      if (!isFinite(enemy.x)) enemy.x = 400;
-      if (!isFinite(enemy.y)) enemy.y = 300;
-
-      var dx = enemy.x - this.x;
-      var dy = enemy.y - this.y;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist >= 100) return;
-
-      triggered = true;
-      var kbAngle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
-      if (isNaN(kbAngle) || !isFinite(kbAngle)) kbAngle = 0;
-
-      var nextX = enemy.x + Math.cos(kbAngle) * 80;
-      var nextY = enemy.y + Math.sin(kbAngle) * 80;
-      if (isFinite(nextX)) enemy.x = nextX;
-      if (isFinite(nextY)) enemy.y = nextY;
-
-      enemy.applySlow(2.0);
-      effectSystem.addHitEffect(enemy.x, enemy.y, '#FFD700');
-      effectSystem.addDamageNumber(enemy.x, enemy.y - enemy.charData.size, '击退 & 减慢!', false, '#FFD700');
-    });
-
-    if (!triggered) return;
-
-    this.whistleCooldown = 6.0;
-    effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#FFD700', 100);
-    effectSystem.screenShake(6);
-    this.showSkillName(effectSystem, '蒸汽鸣笛');
-    effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '鸣笛 TOOT!', false, '#FFD700');
+    return Passives.trySteamWhistle(this, opposingTeam, effectSystem);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1338,12 +907,7 @@ export class Fighter {
    * @returns {boolean} True when damage should be cancelled
    */
   tryDamageAvoidancePassives(effectSystem) {
-    if (!this.hasPassive('saitama_dodge')) return false;
-    if (Math.random() >= 0.35) return false;
-
-    effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '闪避!', false, '#FFFFFF');
-    effectSystem.addHitEffect(this.x, this.y, '#FFFFFF');
-    return true;
+    return Passives.tryDamageAvoidancePassives(this, effectSystem);
   }
 
   /**
@@ -1353,29 +917,7 @@ export class Fighter {
    * @returns {number} Remaining damage
    */
   applyDamageReductionPassives(damage, effectSystem) {
-    if (!this.hasPassive('blood_shield')) return damage;
-
-    if (this.bloodShield > 0) {
-      if (damage >= this.bloodShield) {
-        damage -= this.bloodShield;
-        this.bloodShield = 0;
-        effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '护盾破碎!', false, '#FF1744');
-      } else {
-        this.bloodShield -= damage;
-        effectSystem.addDamageNumber(this.x, this.y - this.charData.size, `吸收 ${Math.floor(damage)}`, false, '#FF5252');
-        damage = 0;
-      }
-    }
-
-    if (damage > 0 && this.hp - damage < 45 && this.bloodShieldCooldown <= 0) {
-      this.bloodShield = 35;
-      this.bloodShieldCooldown = 15.0;
-      effectSystem.addHealEffect(this.x, this.y);
-      effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '+血红护盾!', false, '#FF1744');
-      effectSystem.addSkillEffect('clone', this.x, this.y, '#FF1744', 40);
-    }
-
-    return damage;
+    return Passives.applyDamageReductionPassives(this, damage, effectSystem);
   }
 
   /**
@@ -1384,30 +926,7 @@ export class Fighter {
    * @returns {boolean} True when lethal damage was cancelled
    */
   tryLethalSurvivalPassives(effectSystem) {
-    if (!this.hasPassive('inferno_rebirth') || this.rebirthUsed || this.hp > 0) return false;
-
-    this.rebirthUsed = true;
-    this.hp = Math.min(this.maxHp, 45);
-    this.burnTimer = 0;
-    this.burnDps = 0;
-    effectSystem.addSkillEffect('fire_burst', this.x, this.y, '#FF5722', 150);
-    effectSystem.screenShake(14);
-    effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 18, '浴火重生!', false, '#FFD54F');
-
-    const opposingTeam = this.team === 'left' ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
-    if (opposingTeam) {
-      opposingTeam.forEach(enemy => {
-        if (!enemy.isAlive()) return;
-        const dx = enemy.x - this.x;
-        const dy = enemy.y - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (isFinite(dist) && dist <= 150) {
-          enemy.takeDamage(18, this.x, this.y, effectSystem);
-          enemy.applyBurn(4.0, 6.0);
-        }
-      });
-    }
-    return true;
+    return Passives.tryLethalSurvivalPassives(this, effectSystem);
   }
 
   /**
@@ -1458,13 +977,13 @@ export class Fighter {
       if (dist <= skill.range + 20) {
         this.target.takeDamage(skill.damage, this.x, this.y, effectSystem);
         effectSystem.addDamageNumber(this.target.x, this.target.y - 40, skill.damage, true, '#FFD700');
-        effectSystem.addSkillEffect('backstab', this.target.x, this.target.y, this.charData.color, 20);
+        EffectLib.addBackstabEffect(effectSystem, this.target.x, this.target.y, this.charData.color, 20);
         effectSystem.screenShake(7);
       }
     } else if (this.dashSkillType === 'serious_punch') {
       // One Punch Man serious punch
-      effectSystem.addSkillEffect('meteor', this.x, this.y, '#FFD700', 90);
-      effectSystem.addSkillEffect('aoe_melee', this.x, this.y, '#FF1744', 130);
+      EffectLib.addMeteorEffect(effectSystem, this.x, this.y, '#FFD700', 90);
+      EffectLib.addAoeMeleeEffect(effectSystem, this.x, this.y, '#FF1744', 130);
       effectSystem.screenShake(18);
 
       const opposingTeam = (this.team === 'left') ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
@@ -1484,7 +1003,7 @@ export class Fighter {
 
     // Go to cooldown or reposition
     if (Math.random() < 0.4) {
-      this.startReposition(arenaWidth, arenaHeight, arenaX, arenaY);
+      this.ai.startReposition(arenaWidth, arenaHeight, arenaX, arenaY);
     } else {
       this.setState('cooldown');
       this.repositionType = (this.charData.weaponType === 'ranged') ? 'retreat' : (Math.random() < 0.65 ? 'circle' : 'retreat');

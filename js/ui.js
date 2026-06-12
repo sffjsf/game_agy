@@ -1,4 +1,4 @@
-import { characterData } from './characters.js';
+import { characterData } from './characters/index.js';
 import { soundSystem } from './audio.js';
 
 /**
