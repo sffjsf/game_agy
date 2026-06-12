@@ -2,6 +2,7 @@ import * as EffectLib from '../effects_lib/index.js';
 import { Fighter } from '../fighter.js';
 import { soundSystem } from '../audio.js';
 import { createProjectile } from '../combat/Projectile.js';
+import { executeHavocInHeaven } from './abilities/HavocInHeaven.js';
 
 export function applyMeleeHitPassives(fighter, damage, primaryTarget, effectSystem) {
   if (fighter.hasPassive('saitama_splash')) {
@@ -34,6 +35,13 @@ export function applyMeleeHitPassives(fighter, damage, primaryTarget, effectSyst
     effectSystem.addHitEffect(primaryTarget.x, primaryTarget.y, '#FFD700');
     if (Math.random() < 0.3) {
       effectSystem.addDamageNumber(primaryTarget.x, primaryTarget.y - 15, '大圣威压!', false, '#FF9800');
+    }
+    // Play hit sound locally here if needed
+  }
+
+  if (fighter.hasPassive('havoc_proc') && Math.random() < 0.5) {
+    if (fighter.charData.skill && fighter.charData.skill.type === 'havoc_in_heaven') {
+      executeHavocInHeaven(fighter, fighter.charData.skill, fighter.combatManager.weaponSystem, effectSystem);
     }
   }
 }
@@ -167,11 +175,13 @@ export function tryHeavenlyEye(fighter, opposingTeam, effectSystem) {
 }
 
 export function tryDamageAvoidancePassives(fighter, effectSystem) {
-  if (!fighter.hasPassive('saitama_dodge')) return false;
-  if (Math.random() >= 0.35) return false;
-  effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '闪避!', false, '#FFFFFF');
-  effectSystem.addHitEffect(fighter.x, fighter.y, '#FFFFFF');
-  return true;
+  if (fighter.hasPassive('saitama_dodge') && Math.random() < 0.35) {
+    effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '闪避!', false, '#FFFFFF');
+    effectSystem.addHitEffect(fighter.x, fighter.y, '#FFFFFF');
+    return true;
+  }
+  
+  return false;
 }
 
 export function applyDamageReductionPassives(fighter, damage, effectSystem) {
@@ -198,27 +208,42 @@ export function applyDamageReductionPassives(fighter, damage, effectSystem) {
 }
 
 export function tryLethalSurvivalPassives(fighter, effectSystem) {
-  if (!fighter.hasPassive('inferno_rebirth') || fighter.rebirthUsed || fighter.hp > 0) return false;
-  fighter.rebirthUsed = true;
-  fighter.hp = Math.min(fighter.maxHp, 45);
-  fighter.burnTimer = 0;
-  fighter.burnDps = 0;
-  EffectLib.addFireBurstEffect(effectSystem, fighter.x, fighter.y, '#FF5722', 150);
-  effectSystem.screenShake(14);
-  effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 18, '浴火重生!', false, '#FFD54F');
-  const opposingTeam = fighter.team === 'left' ? fighter.combatManager.fightersRight : fighter.combatManager.fightersLeft;
-  if (opposingTeam) {
-    opposingTeam.forEach(enemy => {
-      if (!enemy.isAlive()) return;
-      const dx = enemy.x - fighter.x;
-      const dy = enemy.y - fighter.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (isFinite(dist) && dist <= 150) {
-        enemy.takeDamage(18, fighter.x, fighter.y, effectSystem);
-        enemy.applyBurn(4.0, 6.0);
-      }
-    });
-  }
-  return true;
-}
+  if (fighter.hp > 0 || fighter.rebirthUsed) return false;
 
+  if (fighter.hasPassive('inferno_rebirth')) {
+    fighter.rebirthUsed = true;
+    fighter.hp = Math.min(fighter.maxHp, 45);
+    fighter.burnTimer = 0;
+    fighter.burnDps = 0;
+    EffectLib.addFireBurstEffect(effectSystem, fighter.x, fighter.y, '#FF5722', 150);
+    effectSystem.screenShake(14);
+    effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 18, '浴火重生!', false, '#FFD54F');
+    const opposingTeam = fighter.team === 'left' ? fighter.combatManager.fightersRight : fighter.combatManager.fightersLeft;
+    if (opposingTeam) {
+      opposingTeam.forEach(enemy => {
+        if (!enemy.isAlive()) return;
+        const dx = enemy.x - fighter.x;
+        const dy = enemy.y - fighter.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (isFinite(dist) && dist <= 150) {
+          enemy.takeDamage(18, fighter.x, fighter.y, effectSystem);
+          enemy.applyBurn(4.0, 6.0);
+        }
+      });
+    }
+    return true;
+  }
+
+  if (fighter.hasPassive('life_saving_hair')) {
+    fighter.rebirthUsed = true;
+    fighter.hp = Math.floor(fighter.maxHp * 0.5); // 恢复 50% 血量
+    fighter.stunTimer = 0;
+    fighter.slowTimer = 0;
+    EffectLib.addCloneEffect(effectSystem, fighter.x, fighter.y, '#FFD700', 80);
+    effectSystem.screenShake(10);
+    effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 18, '救命毫毛!', false, '#FFEB3B');
+    return true;
+  }
+
+  return false;
+}

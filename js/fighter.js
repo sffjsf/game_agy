@@ -851,6 +851,7 @@ export class Fighter {
 
     if (damage <= 0) return;
 
+    const wasAlive = this.hp > 0;
     this.hp -= damage;
     this.hp = Math.max(0, this.hp);
 

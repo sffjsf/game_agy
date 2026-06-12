@@ -25,8 +25,8 @@ export function executeHavocInHeaven(caster, skill, weaponSystem, effectSystem) 
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     if (dist <= skill.range) {
-      // Massive true damage scaling
-      const damage = skill.damage + (caster.charData.attackPower * 1.5);
+      // flat damage as requested
+      const damage = skill.damage;
       enemy.takeDamage(damage, caster.x, caster.y, effectSystem);
       
       // Stun for 1.5s
