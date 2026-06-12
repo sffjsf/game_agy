@@ -21,7 +21,7 @@ export class Fighter {
    */
   constructor(characterId, x, y, team) {
     // Load character data from the global characterData object
-    this.charData = characterData[characterId];
+    this.charData = Object.assign({}, characterData[characterId]);
     if (!this.charData) {
       throw new Error('Unknown character ID: ' + characterId);
     }
@@ -214,6 +214,7 @@ export class Fighter {
     this.hitFlashTimer = Math.max(0, this.hitFlashTimer - dt);
     this.blinkCooldown = Math.max(0, this.blinkCooldown - dt);
     this.cloneTimer = Math.max(0, this.cloneTimer - dt);
+    this.heavenlyEyeCooldown = Math.max(0, (this.heavenlyEyeCooldown || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && (this.poisonTimer <= 0);
 
     this.updatePassiveTimers(dt);
@@ -237,7 +238,12 @@ export class Fighter {
     // ── Update facing angle toward target ──
     if (this.target && this.target.isAlive()) {
       if (isFinite(this.target.x) && isFinite(this.target.y) && isFinite(this.x) && isFinite(this.y)) {
-        this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+        let dx = this.target.x - this.x;
+        let dy = this.target.y - this.y;
+        // Prevent frantic spinning due to collision jitter when overlapping
+        if (dx * dx + dy * dy > 10.0) {
+          this.angle = Math.atan2(dy, dx);
+        }
       }
     }
     if (typeof this.angle !== 'number' || !isFinite(this.angle)) {
@@ -795,6 +801,9 @@ export class Fighter {
     if (this.hasPassive('steam_whistle')) {
       this.trySteamWhistle(opposingTeam, effectSystem);
     }
+    if (this.hasPassive('heavenly_eye')) {
+      Passives.tryHeavenlyEye(this, opposingTeam, effectSystem);
+    }
   }
 
   /**
@@ -1185,7 +1194,9 @@ export class Fighter {
     }
 
     // ── Character decorations ──
-    this.charData.drawDecorations(ctx, this.x, this.y, this.angle, this.charData.size, time);
+    if (typeof this.charData.drawDecorations === 'function') {
+      this.charData.drawDecorations(ctx, this.x, this.y, this.angle, this.charData.size, time);
+    }
 
     // ── HP text centered on body ──
     ctx.save();

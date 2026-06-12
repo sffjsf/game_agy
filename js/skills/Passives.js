@@ -23,6 +23,11 @@ export function applyMeleeHitPassives(fighter, damage, primaryTarget, effectSyst
   if (fighter.hasPassive('spear_pierce')) {
     fighter.applyPiercingLineDamage(damage * 0.55, fighter.charData.attackRange * 1.7, 28, primaryTarget, effectSystem);
   }
+  if (fighter.hasPassive('hound_bite')) {
+    // 40% slow for 2 seconds
+    primaryTarget.applySlow(2.0, 0.6);
+    effectSystem.addHitEffect(primaryTarget.x, primaryTarget.y, '#FF0000');
+  }
 }
 
 export function applyPiercingLineDamage(fighter, damage, range, width, primaryTarget, effectSystem) {
@@ -110,10 +115,47 @@ export function trySteamWhistle(fighter, opposingTeam, effectSystem) {
   });
   if (!triggered) return;
   fighter.whistleCooldown = 6.0;
-  EffectLib.addAoeMeleeEffect(effectSystem, fighter.x, fighter.y, '#FFD700', 100);
-  effectSystem.screenShake(6);
+  EffectLib.addWhistleEffect(effectSystem, fighter.x, fighter.y, fighter.charData.color, 100);
+  soundSystem.playSkillSound();
   fighter.showSkillName(effectSystem, '蒸汽鸣笛');
   effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '鸣笛 TOOT!', false, '#FFD700');
+}
+
+export function tryHeavenlyEye(fighter, opposingTeam, effectSystem) {
+  if (!opposingTeam || fighter.stunTimer > 0 || fighter.heavenlyEyeCooldown > 0) return;
+  
+  // Find furthest enemy
+  let furthestEnemy = null;
+  let maxDist = -1;
+  opposingTeam.forEach(enemy => {
+    if (!enemy.isAlive()) return;
+    let dx = enemy.x - fighter.x;
+    let dy = enemy.y - fighter.y;
+    let dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > maxDist) {
+      maxDist = dist;
+      furthestEnemy = enemy;
+    }
+  });
+
+  if (!furthestEnemy) return;
+
+  fighter.heavenlyEyeCooldown = 5.0; // 5 seconds cooldown
+
+  let angle = Math.atan2(furthestEnemy.y - fighter.y, furthestEnemy.x - fighter.x);
+  if (isNaN(angle) || !isFinite(angle)) angle = 0;
+  let speed = 2500; // Instant basically
+  let vx = Math.cos(angle) * speed;
+  let vy = Math.sin(angle) * speed;
+
+  let damage = fighter.charData.attackPower * 2.5; // True damage multiplier
+  
+  // Create laser projectile that pieces all enemies
+  let proj = createProjectile(fighter.x, fighter.y, vx, vy, damage, fighter.id, '#FFF176', 40, 'laser', fighter);
+  fighter.combatManager.weaponSystem.projectiles.push(proj);
+
+  EffectLib.addStunEffect(effectSystem, fighter.x, fighter.y, '#FFD700', 30);
+  soundSystem.playShootSound();
 }
 
 export function tryDamageAvoidancePassives(fighter, effectSystem) {

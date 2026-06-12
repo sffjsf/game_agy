@@ -9,6 +9,7 @@ import { MagicProjectile } from '../projectiles/MagicProjectile.js';
 import { TrainProjectile } from '../projectiles/TrainProjectile.js';
 import { BananaProjectile } from '../projectiles/BananaProjectile.js';
 import { HomingOrbProjectile } from '../projectiles/HomingOrbProjectile.js';
+import { LaserProjectile } from '../projectiles/LaserProjectile.js';
 
 export function createProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker) {
   switch (type) {
@@ -22,6 +23,7 @@ export function createProjectile(x, y, vx, vy, damage, ownerId, color, size, typ
     case 'train': return new TrainProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
     case 'banana': return new BananaProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
     case 'homing_orb': return new HomingOrbProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
+    case 'laser': return new LaserProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
 
     default: return new BaseProjectile(x, y, vx, vy, damage, ownerId, color, size, type);
   }

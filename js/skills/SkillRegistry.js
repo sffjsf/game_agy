@@ -14,6 +14,7 @@ import { executeStun } from './abilities/Stun.js';
 import { executeBackstab } from './abilities/Backstab.js';
 import { executeSlow } from './abilities/Slow.js';
 import { executeSeriousPunch } from './abilities/SeriousPunch.js';
+import { executeSummonHound } from './abilities/SummonHound.js';
 import { executeSummonBats } from './abilities/SummonBats.js';
 import { executeTrainStampede } from './abilities/TrainStampede.js';
 import { executeSummonLegion } from './abilities/SummonLegion.js';
@@ -71,6 +72,9 @@ export function executeSkillStrategy(caster, skill, weaponSystem, effectSystem) 
         break;
       case 'serious_punch':
         executeSeriousPunch(caster, skill, weaponSystem, effectSystem, dx, dy, dist);
+        break;
+      case 'summon_hound':
+        executeSummonHound(caster, skill, weaponSystem, effectSystem, dx, dy, dist);
         break;
       case 'summon_bats':
         executeSummonBats(caster, skill, weaponSystem, effectSystem, dx, dy, dist);

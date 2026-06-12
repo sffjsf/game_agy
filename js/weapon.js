@@ -154,7 +154,7 @@ export class WeaponSystem {
         var combinedRadius = proj.size + fighter.charData.size;
 
         if (dist < combinedRadius) {
-          if (proj.type === 'train') {
+          if (proj.type === 'train' || proj.type === 'laser') {
             // Train pierces! Only hit each fighter once.
             if (proj.hitFighters.indexOf(fighter) === -1) {
               proj.hitFighters.push(fighter);

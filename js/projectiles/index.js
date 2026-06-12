@@ -6,6 +6,7 @@ import { BombProjectile } from './BombProjectile.js';
 import { MagicProjectile } from './MagicProjectile.js';
 import { SkillProjectileProjectile } from './SkillProjectileProjectile.js';
 import { ShurikenProjectile } from './ShurikenProjectile.js';
+import { LaserProjectile } from './LaserProjectile.js';
 
 export function createProjectile(x, y, vx, vy, damage, ownerId, color, size, type) {
   switch (type) {
@@ -16,6 +17,7 @@ export function createProjectile(x, y, vx, vy, damage, ownerId, color, size, typ
     case 'magic': return new MagicProjectile(x, y, vx, vy, damage, ownerId, color, size, type);
     case 'skill_projectile': return new SkillProjectileProjectile(x, y, vx, vy, damage, ownerId, color, size, type);
     case 'shuriken': return new ShurikenProjectile(x, y, vx, vy, damage, ownerId, color, size, type);
+    case 'laser': return new LaserProjectile(x, y, vx, vy, damage, ownerId, color, size, type);
     default: return new BaseProjectile(x, y, vx, vy, damage, ownerId, color, size, type);
   }
 }

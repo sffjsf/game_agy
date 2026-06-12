@@ -16,6 +16,8 @@ import { spearman } from './Spearman.js';
 import { frost_apprentice } from './FrostApprentice.js';
 import { vulcan } from './Vulcan.js';
 import { summoned_golem } from './SummonedGolem.js';
+import { erlang_shen } from './ErlangShen.js';
+import { xiaotian_hound } from './XiaotianHound.js';
 
 export const characterData = {
   swordsman,
@@ -36,4 +38,6 @@ export const characterData = {
   frost_apprentice,
   vulcan,
   summoned_golem,
+  erlang_shen,
+  xiaotian_hound
 };
