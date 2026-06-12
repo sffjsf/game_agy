@@ -18,6 +18,7 @@ import { executeSummonHound } from './abilities/SummonHound.js';
 import { executeSummonBats } from './abilities/SummonBats.js';
 import { executeTrainStampede } from './abilities/TrainStampede.js';
 import { executeSummonLegion } from './abilities/SummonLegion.js';
+import { executeHavocInHeaven } from './abilities/HavocInHeaven.js';
 
 export function executeSkillStrategy(caster, skill, weaponSystem, effectSystem) {
     if (!caster.target) return;
@@ -85,6 +86,8 @@ export function executeSkillStrategy(caster, skill, weaponSystem, effectSystem) 
       case 'summon_legion':
         executeSummonLegion(caster, skill, weaponSystem, effectSystem, dx, dy, dist);
         break;
-
+      case 'havoc_in_heaven':
+        executeHavocInHeaven(caster, skill, weaponSystem, effectSystem);
+        break;
     }
 }

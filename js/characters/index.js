@@ -18,6 +18,7 @@ import { vulcan } from './Vulcan.js';
 import { summoned_golem } from './SummonedGolem.js';
 import { erlang_shen } from './ErlangShen.js';
 import { xiaotian_hound } from './XiaotianHound.js';
+import { monkey_king } from './MonkeyKing.js';
 
 export const characterData = {
   swordsman,
@@ -39,5 +40,6 @@ export const characterData = {
   vulcan,
   summoned_golem,
   erlang_shen,
-  xiaotian_hound
+  xiaotian_hound,
+  monkey_king
 };

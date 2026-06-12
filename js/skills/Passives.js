@@ -28,6 +28,14 @@ export function applyMeleeHitPassives(fighter, damage, primaryTarget, effectSyst
     primaryTarget.applySlow(2.0, 0.6);
     effectSystem.addHitEffect(primaryTarget.x, primaryTarget.y, '#FF0000');
   }
+  if (fighter.hasPassive('jingu_bang')) {
+    // 穿透一条直线上的敌人
+    applyPiercingLineDamage(fighter, damage * 0.8, fighter.charData.attackRange * 1.5, 30, primaryTarget, effectSystem);
+    effectSystem.addHitEffect(primaryTarget.x, primaryTarget.y, '#FFD700');
+    if (Math.random() < 0.3) {
+      effectSystem.addDamageNumber(primaryTarget.x, primaryTarget.y - 15, '大圣威压!', false, '#FF9800');
+    }
+  }
 }
 
 export function applyPiercingLineDamage(fighter, damage, range, width, primaryTarget, effectSystem) {
