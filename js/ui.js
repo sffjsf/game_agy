@@ -38,8 +38,8 @@ export class UIManager {
     this.reselectBtn = document.getElementById('reselect-btn');
 
     // ── State ──
-    this.selectedLeft = null;
-    this.selectedRight = null;
+    this.selectedLeft = [];
+    this.selectedRight = [];
 
     // ── Callbacks ──
     this._onStartBattle = null;
@@ -79,9 +79,7 @@ export class UIManager {
     this._buildCategory('普通战士', regulars, 'right', this.rightGrid);
     this._buildCategory('英雄角色', heroes, 'right', this.rightGrid);
 
-    // Reset selections as arrays
-    this.selectedLeft = [];
-    this.selectedRight = [];
+    // Keep existing selections, just refresh visuals
     this._updateGridVisuals('left');
     this._updateGridVisuals('right');
     this._updateStartButton();
@@ -95,13 +93,46 @@ export class UIManager {
 
     const header = document.createElement('div');
     header.className = 'category-header';
-    header.innerHTML = `<span>${title} (${charList.length})</span> <span class="category-toggle">▼</span>`;
+    header.innerHTML = `
+      <div class="category-header-title" style="flex: 1; display: flex; align-items: center; gap: 8px;">
+        <span>${title} (${charList.length})</span> 
+        <span class="category-toggle">▼</span>
+      </div>
+      <div class="category-actions">
+        <button class="btn-category btn-select-all">全选</button>
+        <button class="btn-category btn-clear-all">清空</button>
+      </div>
+    `;
     
     const content = document.createElement('div');
     content.className = 'category-content';
 
-    header.addEventListener('click', () => {
+    const titleDiv = header.querySelector('.category-header-title');
+    titleDiv.addEventListener('click', (e) => {
       categoryDiv.classList.toggle('collapsed');
+    });
+
+    const btnSelectAll = header.querySelector('.btn-select-all');
+    btnSelectAll.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const list = side === 'left' ? this.selectedLeft : this.selectedRight;
+      charList.forEach(item => {
+        if (!list.includes(item.id)) list.push(item.id);
+      });
+      this._updateGridVisuals(side);
+      this._updateStartButton();
+    });
+
+    const btnClearAll = header.querySelector('.btn-clear-all');
+    btnClearAll.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const list = side === 'left' ? this.selectedLeft : this.selectedRight;
+      charList.forEach(item => {
+        const index = list.indexOf(item.id);
+        if (index > -1) list.splice(index, 1);
+      });
+      this._updateGridVisuals(side);
+      this._updateStartButton();
     });
 
     charList.forEach(item => {
@@ -450,6 +481,44 @@ export class UIManager {
       closeCodexBtn.addEventListener('click', () => {
         if (soundSystem) soundSystem.playClickSound();
         this.showScreen('select');
+      });
+    }
+
+    // Global bulk actions
+    const handleGlobalSelect = (side, selectAll) => {
+      const list = side === 'left' ? this.selectedLeft : this.selectedRight;
+      if (!selectAll) {
+        // Clear all
+        list.length = 0;
+      } else {
+        // Select all
+        const allIds = Object.keys(characterData).filter(id => !characterData[id].hidden);
+        allIds.forEach(id => {
+          if (!list.includes(id)) list.push(id);
+        });
+      }
+      this._updateGridVisuals(side);
+      this._updateStartButton();
+    };
+
+    const leftSelectAll = document.getElementById('left-select-all');
+    const leftClearAll = document.getElementById('left-clear-all');
+    const rightSelectAll = document.getElementById('right-select-all');
+    const rightClearAll = document.getElementById('right-clear-all');
+
+    if (leftSelectAll) leftSelectAll.addEventListener('click', () => handleGlobalSelect('left', true));
+    if (leftClearAll) leftClearAll.addEventListener('click', () => handleGlobalSelect('left', false));
+    if (rightSelectAll) rightSelectAll.addEventListener('click', () => handleGlobalSelect('right', true));
+    if (rightClearAll) rightClearAll.addEventListener('click', () => handleGlobalSelect('right', false));
+
+    // Speed Control Slider
+    const speedSlider = document.getElementById('speed-slider');
+    const speedDisplay = document.getElementById('speed-display');
+    if (speedSlider && speedDisplay) {
+      speedSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        window.gameSpeed = val;
+        speedDisplay.textContent = val.toFixed(1) + 'x';
       });
     }
 

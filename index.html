@@ -6,7 +6,7 @@
   <title>2D Battle Arena - 多角色战斗系统</title>
   <meta name="description" content="A 2D multi-character auto-battle system with 8 unique fighters">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=2">
+  <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
 
@@ -17,6 +17,10 @@
     <div class="select-container">
       <div class="team-panel" id="left-panel">
         <h2 class="team-title">左方战士</h2>
+        <div class="team-actions">
+          <button id="left-select-all" class="btn-global">全部全选</button>
+          <button id="left-clear-all" class="btn-global">全部清空</button>
+        </div>
         <div class="character-grid" id="left-grid"></div>
       </div>
       <div class="vs-divider">
@@ -24,6 +28,10 @@
       </div>
       <div class="team-panel" id="right-panel">
         <h2 class="team-title">右方战士</h2>
+        <div class="team-actions">
+          <button id="right-select-all" class="btn-global">全部全选</button>
+          <button id="right-clear-all" class="btn-global">全部清空</button>
+        </div>
         <div class="character-grid" id="right-grid"></div>
       </div>
     </div>
@@ -52,6 +60,16 @@
         <span class="hp-text" id="right-hp-text">100/100</span>
       </div>
     </div>
+    
+    <!-- 战斗倍速控制器 -->
+    <div id="speed-control" class="speed-control">
+      <div class="speed-header">
+        <span>战斗倍速</span>
+        <span id="speed-display">1.0x</span>
+      </div>
+      <input type="range" id="speed-slider" min="0.1" max="3" step="0.1" value="1">
+    </div>
+
     <div id="canvas-container">
       <canvas id="battle-canvas"></canvas>
     </div>

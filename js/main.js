@@ -61,16 +61,18 @@ window.addEventListener('DOMContentLoaded', () => {
   let lastTime = 0;
   let resultShown = false;
   let lastCountdownVal = -1;
+  window.gameSpeed = 1.0;
 
   function gameLoop(timestamp) {
     const dt = Math.min((timestamp - lastTime) / 1000, 0.05); // Cap dt at 50ms
     lastTime = timestamp;
 
     const state = combatManager.getState();
+    const speedMultiplier = window.gameSpeed || 1.0;
 
     // ── Update phase ──
     if (state === 'countdown' || state === 'fighting') {
-      combatManager.update(dt);
+      combatManager.update(dt * speedMultiplier);
       resultShown = false;
     }
 
