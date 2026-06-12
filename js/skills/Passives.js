@@ -8,7 +8,7 @@ export function applyMeleeHitPassives(fighter, damage, primaryTarget, effectSyst
   if (fighter.hasPassive('saitama_splash')) {
     EffectLib.addMeteorEffect(effectSystem, primaryTarget.x, primaryTarget.y, '#FFD700', 70);
     effectSystem.screenShake(5);
-    const opposingTeam = fighter.team === 'left' ? fighter.combatManager.fightersRight : fighter.combatManager.fightersLeft;
+    const opposingTeam = fighter._opposingTeam;
     if (opposingTeam) {
       opposingTeam.forEach(enemy => {
         if (!enemy.isAlive() || enemy === primaryTarget) return;
@@ -41,13 +41,13 @@ export function applyMeleeHitPassives(fighter, damage, primaryTarget, effectSyst
 
   if (fighter.hasPassive('havoc_proc') && Math.random() < 0.5) {
     if (fighter.charData.skill && fighter.charData.skill.type === 'havoc_in_heaven') {
-      executeHavocInHeaven(fighter, fighter.charData.skill, fighter.combatManager.weaponSystem, effectSystem);
+      executeHavocInHeaven(fighter, fighter.charData.skill, fighter._weaponSystem, effectSystem);
     }
   }
 }
 
 export function applyPiercingLineDamage(fighter, damage, range, width, primaryTarget, effectSystem) {
-  const opposingTeam = fighter.team === 'left' ? fighter.combatManager.fightersRight : fighter.combatManager.fightersLeft;
+  const opposingTeam = fighter._opposingTeam;
   if (!opposingTeam) return;
   var dirX = Math.cos(fighter.angle);
   var dirY = Math.sin(fighter.angle);
@@ -65,22 +65,21 @@ export function applyPiercingLineDamage(fighter, damage, range, width, primaryTa
 }
 
 export function performSummonerBasicAttack(fighter, effectSystem) {
-  const teamArr = fighter.team === 'left' ? fighter.combatManager.fightersLeft : fighter.combatManager.fightersRight;
+  const teamArr = fighter._ownTeam;
   if (!teamArr) return;
   var spawnX = fighter.x + (Math.random() - 0.5) * 60;
   var spawnY = fighter.y + (Math.random() - 0.5) * 60;
   var minion = new Fighter('summoned_golem', spawnX, spawnY, fighter.team);
-  minion.combatManager = fighter.combatManager;
   teamArr.push(minion);
   EffectLib.addCloneEffect(effectSystem, spawnX, spawnY, '#E040FB', 30);
   if (soundSystem) soundSystem.playSummonSound();
 }
 
 export function executeFireConeAttack(fighter, effectSystem) {
-  if (!fighter.combatManager) return;
+  if (!fighter._opposingTeam) return;
   const range = fighter.charData.attackRange || 190;
   const coneHalfAngle = Math.PI / 4;
-  const opposingTeam = fighter.team === 'left' ? fighter.combatManager.fightersRight : fighter.combatManager.fightersLeft;
+  const opposingTeam = fighter._opposingTeam;
   if (!opposingTeam) return;
   if (effectSystem.addFireCone) {
     effectSystem.addFireCone(fighter.x, fighter.y, fighter.angle, '#FF5722', range);
@@ -106,7 +105,7 @@ export function executeFireConeAttack(fighter, effectSystem) {
 }
 
 export function trySteamWhistle(fighter, opposingTeam, effectSystem) {
-  if (!opposingTeam || fighter.stunTimer > 0 || fighter.whistleCooldown > 0) return;
+  if (!opposingTeam || fighter.isStunned() || fighter.whistleCooldown > 0) return;
   var triggered = false;
   opposingTeam.forEach(enemy => {
     if (!enemy.isAlive()) return;
@@ -138,7 +137,7 @@ export function trySteamWhistle(fighter, opposingTeam, effectSystem) {
 }
 
 export function tryHeavenlyEye(fighter, opposingTeam, effectSystem) {
-  if (!opposingTeam || fighter.stunTimer > 0 || fighter.heavenlyEyeCooldown > 0) return;
+  if (!opposingTeam || fighter.isStunned() || fighter.heavenlyEyeCooldown > 0) return;
   
   // Find furthest enemy
   let furthestEnemy = null;
@@ -168,7 +167,7 @@ export function tryHeavenlyEye(fighter, opposingTeam, effectSystem) {
   
   // Create laser projectile that pieces all enemies
   let proj = createProjectile(fighter.x, fighter.y, vx, vy, damage, fighter.id, '#FFF176', 40, 'laser', fighter);
-  fighter.combatManager.weaponSystem.projectiles.push(proj);
+  fighter._weaponSystem.projectiles.push(proj);
 
   EffectLib.addStunEffect(effectSystem, fighter.x, fighter.y, '#FFD700', 30);
   soundSystem.playShootSound();
@@ -213,12 +212,11 @@ export function tryLethalSurvivalPassives(fighter, effectSystem) {
   if (fighter.hasPassive('inferno_rebirth')) {
     fighter.rebirthUsed = true;
     fighter.hp = Math.min(fighter.maxHp, 45);
-    fighter.burnTimer = 0;
-    fighter.burnDps = 0;
+    fighter.buffs.clearBurn();
     EffectLib.addFireBurstEffect(effectSystem, fighter.x, fighter.y, '#FF5722', 150);
     effectSystem.screenShake(14);
     effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 18, '浴火重生!', false, '#FFD54F');
-    const opposingTeam = fighter.team === 'left' ? fighter.combatManager.fightersRight : fighter.combatManager.fightersLeft;
+    const opposingTeam = fighter._opposingTeam;
     if (opposingTeam) {
       opposingTeam.forEach(enemy => {
         if (!enemy.isAlive()) return;
@@ -237,8 +235,7 @@ export function tryLethalSurvivalPassives(fighter, effectSystem) {
   if (fighter.hasPassive('life_saving_hair')) {
     fighter.rebirthUsed = true;
     fighter.hp = Math.floor(fighter.maxHp * 0.5); // 恢复 50% 血量
-    fighter.stunTimer = 0;
-    fighter.slowTimer = 0;
+    fighter.buffs.clearDebuffs();
     EffectLib.addCloneEffect(effectSystem, fighter.x, fighter.y, '#FFD700', 80);
     effectSystem.screenShake(10);
     effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 18, '救命毫毛!', false, '#FFEB3B');

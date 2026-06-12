@@ -1,5 +1,23 @@
 import { createProjectile } from './combat/Projectile.js';
 import { soundSystem } from './audio.js';
+import { safeDirection, normaliseAngle } from './utils.js';
+
+/**
+ * Default projectile properties by type.
+ * Extend this map when adding new projectile types.
+ */
+const PROJECTILE_DEFAULTS = {
+  arrow:            { speed: 400, size: 5 },
+  magic:            { speed: 300, size: 6 },
+  homing_orb:       { speed: 300, size: 6 },
+  shuriken:         { speed: 380, size: 5 },
+  banana:           { speed: 320, size: 6 },
+  bomb:             { speed: 520, size: 10 },
+  poison:           { speed: 420, size: 7 },
+  train:            { speed: 300, size: 24 },
+  skill_projectile: { speed: 280, size: 8 },
+};
+const DEFAULT_PROJECTILE = { speed: 350, size: 5 };
 
 export class WeaponSystem {
   constructor() {
@@ -21,27 +39,16 @@ export class WeaponSystem {
       return { hit: false, damage: 0 };
     }
 
-    // Calculate distance between attacker and target
-    var dx = target.x - attacker.x;
-    var dy = target.y - attacker.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
+    const dir = safeDirection(target.x - attacker.x, target.y - attacker.y);
 
     // Check if within range
-    if (dist > range) {
+    if (dir.dist > range) {
       return { hit: false, damage: 0 };
     }
 
-    // Check if target is within a 90-degree arc (PI/2 total, PI/4 each side)
-    var angleToTarget = Math.atan2(dy, dx);
-    var angleDiff = angleToTarget - angle;
-
-    if (isNaN(angleDiff) || !isFinite(angleDiff)) {
-      angleDiff = 0;
-    }
-
-    // Normalize to [-PI, PI]
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    // Check if target is within a 90-degree arc (PI/4 each side)
+    const angleToTarget = Math.atan2(dir.dy, dir.dx);
+    const angleDiff = normaliseAngle(angleToTarget - angle);
 
     if (Math.abs(angleDiff) <= Math.PI / 4) {
       return { hit: true, damage: damage };
@@ -62,57 +69,25 @@ export class WeaponSystem {
    * @param {string} color - Projectile color
    * @returns {Projectile} The created projectile
    */
-  createRangedAttack(x, y, targetX, targetY, damage, ownerId, type, color, attacker) {
-    // Calculate direction to target
-    var dx = targetX - x;
-    var dy = targetY - y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
+  createRangedAttack(x, y, targetX, targetY, damage, ownerId, type, color, attacker, opposingTeam) {
+    const dir = safeDirection(
+      targetX - x,
+      targetY - y,
+      { dx: ownerId === 'left' ? 1 : -1, dy: 0 }
+    );
 
-    // Avoid division by zero or non-finite values
-    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
-      dx = (ownerId === 'left') ? 1 : -1;
-      dy = 0;
-      dist = 1;
-    }
+    // Speed: character override > type default > universal default
+    const charSpeed = (attacker && attacker.charData && attacker.charData.projectileSpeed);
+    const cfg = PROJECTILE_DEFAULTS[type] || DEFAULT_PROJECTILE;
+    const speed = charSpeed || cfg.speed;
+    const size = cfg.size;
 
-    var dirX = dx / dist;
-    var dirY = dy / dist;
-
-    // Projectile speed varies by attacker or defaults
-    var speed = 350;
-    if (attacker && attacker.charData && attacker.charData.projectileSpeed) {
-      speed = attacker.charData.projectileSpeed;
-    } else {
-      if (type === 'arrow') speed = 400;
-      if (type === 'magic') speed = 300;
-      if (type === 'shuriken') speed = 380;
-      if (type === 'banana') speed = 320;
-      if (type === 'bomb') speed = 520;
-      if (type === 'poison') speed = 420;
-      if (type === 'train') speed = 300;
-      if (type === 'skill_projectile') speed = 280;
-    }
-
-    var vx = dirX * speed;
-    var vy = dirY * speed;
-
-    // Determine default size by type
-    var size;
-    switch (type) {
-      case 'arrow':            size = 5; break;
-      case 'magic':
-      case 'homing_orb':       size = 6; break;
-      case 'shuriken':         size = 5; break;
-      case 'banana':           size = 6; break;
-      case 'bomb':             size = 10; break;
-      case 'poison':           size = 7; break;
-      case 'train':            size = 24; break;
-      case 'skill_projectile': size = 8; break;
-      default:                 size = 5; break;
-    }
+    var vx = dir.dx * speed;
+    var vy = dir.dy * speed;
 
     var proj = createProjectile(x, y, vx, vy, damage, ownerId, color, size, type);
     if (attacker) proj.attacker = attacker;
+    if (opposingTeam) proj.opposingTeam = opposingTeam;
     this.projectiles.push(proj);
     return proj;
   }

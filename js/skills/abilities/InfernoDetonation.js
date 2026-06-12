@@ -5,16 +5,16 @@ import { soundSystem } from '../../audio.js';
 export function executeInfernoDetonation(caster, skill, weaponSystem, effectSystem, dx, dy, dist) {
 {
   const area = skill.area || 115;
-  const opposingTeam = caster.team === 'left' ? caster.combatManager.fightersRight : caster.combatManager.fightersLeft;
+  const opposingTeam = caster._opposingTeam;
   if (opposingTeam) {
-    var burningTargets = opposingTeam.filter(enemy => enemy.isAlive() && enemy.burnTimer > 0);
+    var burningTargets = opposingTeam.filter(enemy => enemy.isAlive() && enemy.isBurning());
     if (burningTargets.length === 0 && caster.target && caster.target.isAlive()) {
       caster.target.applyBurn(skill.burnDuration || 3.5, skill.burnDps || 6);
       burningTargets = [caster.target];
     }
     burningTargets.forEach(burningEnemy => {
       EffectLib.addFireBurstEffect(effectSystem, burningEnemy.x, burningEnemy.y, '#FF5722', area);
-      caster.combatManager.applyAreaDamage(burningEnemy.x, burningEnemy.y, caster.team, skill.damage, area, caster);
+      if (caster._applyAreaDamage) caster._applyAreaDamage(burningEnemy.x, burningEnemy.y, caster.team, skill.damage, area, caster);
       opposingTeam.forEach(enemy => {
         if (!enemy.isAlive()) return;
         const ex = enemy.x - burningEnemy.x;

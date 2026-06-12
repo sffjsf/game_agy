@@ -8,14 +8,11 @@ export function executeSummonHound(caster, skill, weaponSystem, effectSystem) {
   var spawnY = caster.y + (Math.random() - 0.5) * 60;
   
   var hound = new Fighter('xiaotian_hound', spawnX, spawnY, caster.team);
-  hound.combatManager = caster.combatManager;
   // Hound scales with caster's stats somewhat, or just flat base stats
   hound.charData.attackPower += caster.charData.attackPower * 0.3; // Gains 30% of Erlang's attack
-  
-  if (caster.team === 'left') {
-    caster.combatManager.fightersLeft.push(hound);
-  } else {
-    caster.combatManager.fightersRight.push(hound);
+
+  if (caster._ownTeam) {
+    caster._ownTeam.push(hound);
   }
   
   // Stun effect as a summon poof

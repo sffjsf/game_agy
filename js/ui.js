@@ -511,16 +511,7 @@ export class UIManager {
     if (rightSelectAll) rightSelectAll.addEventListener('click', () => handleGlobalSelect('right', true));
     if (rightClearAll) rightClearAll.addEventListener('click', () => handleGlobalSelect('right', false));
 
-    // Speed Control Slider
-    const speedSlider = document.getElementById('speed-slider');
-    const speedDisplay = document.getElementById('speed-display');
-    if (speedSlider && speedDisplay) {
-      speedSlider.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value);
-        window.gameSpeed = val;
-        speedDisplay.textContent = val.toFixed(1) + 'x';
-      });
-    }
+    // Speed Control Slider — now handled in main.js
 
     // Keyboard navigation for result screen
     document.addEventListener('keydown', (e) => {

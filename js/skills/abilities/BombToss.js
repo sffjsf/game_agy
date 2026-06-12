@@ -9,8 +9,8 @@ export function executeBombToss(caster, skill, weaponSystem, effectSystem, dx, d
   const targetY = caster.target.y;
   EffectLib.addBombEffect(effectSystem, targetX, targetY, caster.charData.color, area);
   effectSystem.screenShake(7);
-  if (caster.combatManager) {
-    caster.combatManager.applyAreaDamage(targetX, targetY, caster.team, skill.damage, area, caster);
+  if (caster._applyAreaDamage) {
+    caster._applyAreaDamage(targetX, targetY, caster.team, skill.damage, area, caster);
   }
   return;
 }

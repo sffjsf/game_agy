@@ -15,7 +15,7 @@ export function executeHavocInHeaven(caster, skill, weaponSystem, effectSystem) 
   }
   
   // Apply damage and stun to all enemies in range
-  const opposingTeam = caster.team === 'left' ? caster.combatManager.fightersRight : caster.combatManager.fightersLeft;
+  const opposingTeam = caster._opposingTeam;
   if (!opposingTeam) return;
 
   opposingTeam.forEach(enemy => {

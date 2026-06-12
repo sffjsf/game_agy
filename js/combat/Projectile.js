@@ -11,20 +11,25 @@ import { BananaProjectile } from '../projectiles/BananaProjectile.js';
 import { HomingOrbProjectile } from '../projectiles/HomingOrbProjectile.js';
 import { LaserProjectile } from '../projectiles/LaserProjectile.js';
 
-export function createProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker) {
-  switch (type) {
-    case 'skill_projectile': return new SkillProjectileProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'bat': return new BatProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'bomb': return new BombProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'arrow': return new ArrowProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'shuriken': return new ShurikenProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'poison': return new PoisonProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'magic': return new MagicProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'train': return new TrainProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'banana': return new BananaProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'homing_orb': return new HomingOrbProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
-    case 'laser': return new LaserProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
+/**
+ * Projectile type → constructor map.
+ * Add a new projectile type: import it, add one entry here — done.
+ */
+const projectileTypes = {
+  skill_projectile: SkillProjectileProjectile,
+  bat:              BatProjectile,
+  bomb:             BombProjectile,
+  arrow:            ArrowProjectile,
+  shuriken:         ShurikenProjectile,
+  poison:           PoisonProjectile,
+  magic:            MagicProjectile,
+  train:            TrainProjectile,
+  banana:           BananaProjectile,
+  homing_orb:       HomingOrbProjectile,
+  laser:            LaserProjectile,
+};
 
-    default: return new BaseProjectile(x, y, vx, vy, damage, ownerId, color, size, type);
-  }
+export function createProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker) {
+  const Cls = projectileTypes[type] || BaseProjectile;
+  return new Cls(x, y, vx, vy, damage, ownerId, color, size, type, attacker);
 }

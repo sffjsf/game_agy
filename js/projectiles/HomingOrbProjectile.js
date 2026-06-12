@@ -3,50 +3,47 @@ import { BaseProjectile } from './BaseProjectile.js';
 export class HomingOrbProjectile extends BaseProjectile {
   update(dt) {
     super.update(dt);
-if (this.attacker.combatManager) {
-            var opposingTeam = (this.ownerId === 'left') ? this.attacker.combatManager.fightersRight : this.attacker.combatManager.fightersLeft;
-            if (opposingTeam) {
-              var target = null;
-              var minDist = Infinity;
-              opposingTeam.forEach(enemy => {
-                if (enemy.isAlive()) {
-                  var dx = enemy.x - this.x;
-                  var dy = enemy.y - this.y;
-                  var d = Math.sqrt(dx * dx + dy * dy);
-                  if (d < minDist) {
-                    minDist = d;
-                    target = enemy;
-                  }
-                }
-              });
-    
-              if (target) {
-                var tx = target.x - this.x;
-                var ty = target.y - this.y;
-                var tdist = Math.sqrt(tx * tx + ty * ty);
-                if (!isFinite(tx) || !isFinite(ty) || !isFinite(tdist) || tdist < 1) {
-                  tx = (this.ownerId === 'left') ? 1 : -1;
-                  ty = 0;
-                  tdist = 1;
-                }
-                
-                var homingSpeed = this.type === 'homing_orb' ? 550 : 380;
-                var targetVx = (tx / tdist) * homingSpeed;
-                var targetVy = (ty / tdist) * homingSpeed;
-    
-                // Interpolate velocity for smooth steering
-                if (isFinite(targetVx) && isFinite(targetVy)) {
-                  var turnRate = this.type === 'homing_orb' ? 0.25 : 0.12;
-                  this.vx = this.vx * (1 - turnRate) + targetVx * turnRate;
-                  this.vy = this.vy * (1 - turnRate) + targetVy * turnRate;
-                }
-              }
-            }
+    var opposingTeam = this.opposingTeam;
+    if (opposingTeam) {
+      var target = null;
+      var minDist = Infinity;
+      opposingTeam.forEach(enemy => {
+        if (enemy.isAlive()) {
+          var dx = enemy.x - this.x;
+          var dy = enemy.y - this.y;
+          var d = Math.sqrt(dx * dx + dy * dy);
+          if (d < minDist) {
+            minDist = d;
+            target = enemy;
           }
-          if (this.type === 'bat') {
-            this.rotation = Math.sin(this.lifetime * 25) * 0.4;
-          }
-    
+        }
+      });
+
+      if (target) {
+        var tx = target.x - this.x;
+        var ty = target.y - this.y;
+        var tdist = Math.sqrt(tx * tx + ty * ty);
+        if (!isFinite(tx) || !isFinite(ty) || !isFinite(tdist) || tdist < 1) {
+          tx = (this.ownerId === 'left') ? 1 : -1;
+          ty = 0;
+          tdist = 1;
+        }
+
+        var homingSpeed = this.type === 'homing_orb' ? 550 : 380;
+        var targetVx = (tx / tdist) * homingSpeed;
+        var targetVy = (ty / tdist) * homingSpeed;
+
+        // Interpolate velocity for smooth steering
+        if (isFinite(targetVx) && isFinite(targetVy)) {
+          var turnRate = this.type === 'homing_orb' ? 0.25 : 0.12;
+          this.vx = this.vx * (1 - turnRate) + targetVx * turnRate;
+          this.vy = this.vy * (1 - turnRate) + targetVy * turnRate;
+        }
+      }
+    }
+    if (this.type === 'bat') {
+      this.rotation = Math.sin(this.lifetime * 25) * 0.4;
+    }
   }
   render(ctx) {
 ctx.translate(this.x, this.y);

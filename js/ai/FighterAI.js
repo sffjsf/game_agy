@@ -1,6 +1,19 @@
+import { safeDirection } from '../utils.js';
+
 export class FighterAI {
   constructor(fighter) {
     this.fighter = fighter;
+    // Movement strategy registry — one method per movePattern.
+    // Each receives (dt, moveSpeed, dir, effectSystem) where dir = {dx, dy, dist}.
+    this._movementStrategies = {
+      linear:       this._moveLinear.bind(this),
+      keepDistance: this._moveKeepDistance.bind(this),
+      arc:          this._moveArc.bind(this),
+      dash:         this._moveDash.bind(this),
+      zigzag:       this._moveZigzag.bind(this),
+      flank:        this._moveFlank.bind(this),
+      wobble:       this._moveWobble.bind(this),
+    };
   }
 
   findClosestTarget(opposingTeam) {
@@ -10,7 +23,7 @@ export class FighterAI {
     }
 
     // If current target is alive and we are already committed to an attack/skill, keep it
-    if (this.fighter.target && this.fighter.target.isAlive() && 
+    if (this.fighter.target && this.fighter.target.isAlive() &&
         (this.fighter.state === 'charge' || this.fighter.state === 'attack' || this.fighter.state === 'skill' || this.fighter.state === 'dashing_skill')) {
       return;
     }
@@ -54,167 +67,119 @@ export class FighterAI {
 
     // Convert speed: charData.speed is px/frame at 60fps → px/sec = speed * 60
     var baseSpeed = this.fighter.charData.speed * 60;
-    var moveSpeed = baseSpeed * dt * (this.fighter.slowTimer > 0 ? 0.5 : 1.0);
+    var moveSpeed = baseSpeed * dt * (this.fighter.isSlowed() ? 0.5 : 1.0);
 
-    var dx = this.fighter.target.x - this.fighter.x;
-    var dy = this.fighter.target.y - this.fighter.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
-      dx = 0;
-      dy = 0;
-      dist = 1;
+    const dir = safeDirection(
+      this.fighter.target.x - this.fighter.x,
+      this.fighter.target.y - this.fighter.y
+    );
+
+    const strategy = this._movementStrategies[this.fighter.charData.movePattern];
+    if (strategy) {
+      strategy(dt, moveSpeed, dir, effectSystem);
+    }
+  }
+
+  // ── Movement strategies (one per movePattern) ────────────
+
+  /** LINEAR: Direct approach */
+  _moveLinear(dt, moveSpeed, dir) {
+    this.fighter.x += dir.dx * moveSpeed;
+    this.fighter.y += dir.dy * moveSpeed;
+  }
+
+  /** KEEP DISTANCE: Maintain ideal range */
+  _moveKeepDistance(dt, moveSpeed, dir) {
+    var idealDist = this.fighter.charData.attackRange * 0.7;
+    if (this.fighter.skillReady && this.fighter.charData.skill) {
+      idealDist = Math.min(idealDist, this.fighter.charData.skill.range * 0.8);
     }
 
-    switch (this.fighter.charData.movePattern) {
-
-      // ── LINEAR: Direct approach ──
-      case 'linear':
-        this.fighter.x += (dx / dist) * moveSpeed;
-        this.fighter.y += (dy / dist) * moveSpeed;
-        break;
-
-      // ── KEEP DISTANCE: Maintain ideal range ──
-      case 'keepDistance': {
-        var idealDist = this.fighter.charData.attackRange * 0.7;
-        
-        // If skill is ready, ensure we get close enough to cast it
-        if (this.fighter.skillReady && this.fighter.charData.skill) {
-          idealDist = Math.min(idealDist, this.fighter.charData.skill.range * 0.8);
-        }
-
-        if (dist < idealDist - 20) {
-          // Too close → move away
-          this.fighter.x -= (dx / dist) * moveSpeed;
-          this.fighter.y -= (dy / dist) * moveSpeed;
-        } else if (dist > idealDist + 20) {
-          // Too far → move closer
-          this.fighter.x += (dx / dist) * moveSpeed;
-          this.fighter.y += (dy / dist) * moveSpeed;
-        }
-
-        // Add perpendicular drift to avoid being stationary
-        var perpX = -dy / dist;
-        var perpY = dx / dist;
-        this.fighter.x += perpX * moveSpeed * 0.3;
-        this.fighter.y += perpY * moveSpeed * 0.3;
-        break;
-      }
-
-      // ── ARC: Orbit around target ──
-      case 'arc': {
-        this.fighter.flankAngle += dt * 1.5;
-        var idealDist = this.fighter.charData.attackRange * 0.8;
-        
-        // If skill is ready, ensure we get close enough to cast it
-        if (this.fighter.skillReady && this.fighter.charData.skill) {
-          idealDist = Math.min(idealDist, this.fighter.charData.skill.range * 0.8);
-        }
-
-        // Target orbit position
-        var orbitX = this.fighter.target.x + Math.cos(this.fighter.flankAngle) * idealDist;
-        var orbitY = this.fighter.target.y + Math.sin(this.fighter.flankAngle) * idealDist;
-
-        // Move toward orbit position
-        var toDx = orbitX - this.fighter.x;
-        var toDy = orbitY - this.fighter.y;
-        var toDist = Math.sqrt(toDx * toDx + toDy * toDy);
-        if (!isFinite(toDx) || !isFinite(toDy) || !isFinite(toDist) || toDist < 1) {
-          toDx = 0;
-          toDy = 0;
-          toDist = 1;
-        }
-        this.fighter.x += (toDx / toDist) * moveSpeed;
-        this.fighter.y += (toDy / toDist) * moveSpeed;
-        break;
-      }
-
-      // ── DASH: Normal movement + periodic high-speed slide ──
-      case 'dash': {
-        // Handle active short dash movement
-        if (this.fighter.shortDashTimer > 0) {
-          this.fighter.shortDashTimer -= dt;
-          if (isFinite(this.fighter.shortDashVx) && isFinite(this.fighter.shortDashVy)) {
-            this.fighter.x += this.fighter.shortDashVx * dt;
-            this.fighter.y += this.fighter.shortDashVy * dt;
-          }
-          
-          if (effectSystem && Math.random() < 0.4) {
-            effectSystem.addTrail(this.fighter.x, this.fighter.y, this.fighter.charData.color + '60', 3);
-          }
-          break;
-        }
-
-        // Normal approach
-        this.fighter.x += (dx / dist) * moveSpeed;
-        this.fighter.y += (dy / dist) * moveSpeed;
-
-        // Trigger a smooth high-speed glide
-        if (this.fighter.blinkCooldown <= 0 && dist > 70) {
-          // Slide 90-120px towards target over 0.15s
-          var dashDist = 90 + Math.random() * 30;
-          this.fighter.shortDashTimer = 0.15;
-          this.fighter.shortDashVx = (dx / dist) * (dashDist / 0.15);
-          this.fighter.shortDashVy = (dy / dist) * (dashDist / 0.15);
-
-          // Reset dash cooldown
-          this.fighter.blinkCooldown = 2.0 + Math.random() * 1.5;
-        }
-        break;
-      }
-
-      // ── ZIGZAG: Alternating perpendicular movement ──
-      case 'zigzag': {
-        this.fighter.moveTimer += dt;
-        if (this.fighter.moveTimer >= 0.4) {
-          this.fighter.zigzagDir *= -1;
-          this.fighter.moveTimer = 0;
-        }
-
-        // Forward direction
-        var fx = dx / dist;
-        var fy = dy / dist;
-
-        // Perpendicular direction
-        var px = -fy;
-        var py = fx;
-
-        this.fighter.x += (fx + px * this.fighter.zigzagDir * 0.7) * moveSpeed;
-        this.fighter.y += (fy + py * this.fighter.zigzagDir * 0.7) * moveSpeed;
-        break;
-      }
-
-      // ── FLANK: Move to target's back ──
-      case 'flank': {
-        // Position behind the enemy (opposite their facing angle)
-        var behindX = this.fighter.target.x - Math.cos(this.fighter.target.angle) * 60;
-        var behindY = this.fighter.target.y - Math.sin(this.fighter.target.angle) * 60;
-
-        var fDx = behindX - this.fighter.x;
-        var fDy = behindY - this.fighter.y;
-        var fDist = Math.sqrt(fDx * fDx + fDy * fDy);
-
-        if (!isFinite(fDx) || !isFinite(fDy) || !isFinite(fDist) || fDist < 1) {
-          fDx = 0;
-          fDy = 0;
-          fDist = 1;
-        }
-        this.fighter.x += (fDx / fDist) * moveSpeed;
-        this.fighter.y += (fDy / fDist) * moveSpeed;
-        break;
-      }
-
-      // ── WOBBLE: Unpredictable wobbly path ──
-      case 'wobble': {
-        this.fighter.wobbleAngle += dt * 8;
-
-        var wobbleX = Math.cos(this.fighter.wobbleAngle) * moveSpeed * 0.5;
-        var wobbleY = Math.sin(this.fighter.wobbleAngle * 1.3) * moveSpeed * 0.5;
-
-        this.fighter.x += (dx / dist) * moveSpeed * 0.7 + wobbleX;
-        this.fighter.y += (dy / dist) * moveSpeed * 0.7 + wobbleY;
-        break;
-      }
+    if (dir.dist < idealDist - 20) {
+      this.fighter.x -= dir.dx * moveSpeed;
+      this.fighter.y -= dir.dy * moveSpeed;
+    } else if (dir.dist > idealDist + 20) {
+      this.fighter.x += dir.dx * moveSpeed;
+      this.fighter.y += dir.dy * moveSpeed;
     }
+
+    // Perpendicular drift to avoid being stationary
+    this.fighter.x += -dir.dy * moveSpeed * 0.3;
+    this.fighter.y += dir.dx * moveSpeed * 0.3;
+  }
+
+  /** ARC: Orbit around target */
+  _moveArc(dt, moveSpeed, dir) {
+    this.fighter.flankAngle += dt * 1.5;
+    var idealDist = this.fighter.charData.attackRange * 0.8;
+    if (this.fighter.skillReady && this.fighter.charData.skill) {
+      idealDist = Math.min(idealDist, this.fighter.charData.skill.range * 0.8);
+    }
+
+    var orbitX = this.fighter.target.x + Math.cos(this.fighter.flankAngle) * idealDist;
+    var orbitY = this.fighter.target.y + Math.sin(this.fighter.flankAngle) * idealDist;
+
+    const toDir = safeDirection(orbitX - this.fighter.x, orbitY - this.fighter.y);
+    this.fighter.x += toDir.dx * moveSpeed;
+    this.fighter.y += toDir.dy * moveSpeed;
+  }
+
+  /** DASH: Normal movement + periodic high-speed slide */
+  _moveDash(dt, moveSpeed, dir, effectSystem) {
+    if (this.fighter.shortDashTimer > 0) {
+      this.fighter.shortDashTimer -= dt;
+      if (isFinite(this.fighter.shortDashVx) && isFinite(this.fighter.shortDashVy)) {
+        this.fighter.x += this.fighter.shortDashVx * dt;
+        this.fighter.y += this.fighter.shortDashVy * dt;
+      }
+      if (effectSystem && Math.random() < 0.4) {
+        effectSystem.addTrail(this.fighter.x, this.fighter.y, this.fighter.charData.color + '60', 3);
+      }
+      return;
+    }
+
+    this.fighter.x += dir.dx * moveSpeed;
+    this.fighter.y += dir.dy * moveSpeed;
+
+    if (this.fighter.blinkCooldown <= 0 && dir.dist > 70) {
+      var dashDist = 90 + Math.random() * 30;
+      this.fighter.shortDashTimer = 0.15;
+      this.fighter.shortDashVx = dir.dx * (dashDist / 0.15);
+      this.fighter.shortDashVy = dir.dy * (dashDist / 0.15);
+      this.fighter.blinkCooldown = 2.0 + Math.random() * 1.5;
+    }
+  }
+
+  /** ZIGZAG: Alternating perpendicular movement */
+  _moveZigzag(dt, moveSpeed, dir) {
+    this.fighter.moveTimer += dt;
+    if (this.fighter.moveTimer >= 0.4) {
+      this.fighter.zigzagDir *= -1;
+      this.fighter.moveTimer = 0;
+    }
+    // Perpendicular direction
+    var px = -dir.dy;
+    var py = dir.dx;
+    this.fighter.x += (dir.dx + px * this.fighter.zigzagDir * 0.7) * moveSpeed;
+    this.fighter.y += (dir.dy + py * this.fighter.zigzagDir * 0.7) * moveSpeed;
+  }
+
+  /** FLANK: Move to target's back */
+  _moveFlank(dt, moveSpeed, dir) {
+    var behindX = this.fighter.target.x - Math.cos(this.fighter.target.angle) * 60;
+    var behindY = this.fighter.target.y - Math.sin(this.fighter.target.angle) * 60;
+    const toDir = safeDirection(behindX - this.fighter.x, behindY - this.fighter.y);
+    this.fighter.x += toDir.dx * moveSpeed;
+    this.fighter.y += toDir.dy * moveSpeed;
+  }
+
+  /** WOBBLE: Unpredictable wobbly path */
+  _moveWobble(dt, moveSpeed, dir) {
+    this.fighter.wobbleAngle += dt * 8;
+    var wobbleX = Math.cos(this.fighter.wobbleAngle) * moveSpeed * 0.5;
+    var wobbleY = Math.sin(this.fighter.wobbleAngle * 1.3) * moveSpeed * 0.5;
+    this.fighter.x += dir.dx * moveSpeed * 0.7 + wobbleX;
+    this.fighter.y += dir.dy * moveSpeed * 0.7 + wobbleY;
   }
 
   startReposition(arenaWidth, arenaHeight, arenaX, arenaY) {
@@ -278,7 +243,7 @@ export class FighterAI {
     if (!this.fighter.target || !this.fighter.target.isAlive()) return;
 
     var baseSpeed = this.fighter.charData.speed * 60;
-    var moveSpeed = baseSpeed * dt * (this.fighter.slowTimer > 0 ? 0.5 : 1.0);
+    var moveSpeed = baseSpeed * dt * (this.fighter.isSlowed() ? 0.5 : 1.0);
 
     var dx = this.fighter.target.x - this.fighter.x;
     var dy = this.fighter.target.y - this.fighter.y;

@@ -56,58 +56,50 @@ window.addEventListener('DOMContentLoaded', () => {
     uiManager.initCharacterSelect();
   });
 
+  /* ── Wire CombatManager → UIManager via observer callbacks ── */
+
+  combatManager.onCountdownTick = (info) => {
+    if (info.type === 'number') {
+      uiManager.showCountdown(info.count);
+    } else if (info.type === 'fight') {
+      uiManager.showCountdown('FIGHT!');
+    } else if (info.type === 'end') {
+      uiManager.hideCountdown();
+    }
+  };
+
+  combatManager.onBattleEnd = (winner, battleTime) => {
+    uiManager.showResult(winner, battleTime);
+  };
+
+  /* ── Speed control ────────────────────────────────────── */
+  const speedSlider = document.getElementById('speed-slider');
+  const speedDisplay = document.getElementById('speed-display');
+  if (speedSlider && speedDisplay) {
+    speedSlider.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      combatManager.speedMultiplier = val;
+      speedDisplay.textContent = val.toFixed(1) + 'x';
+    });
+  }
+
   /* ── Game loop ────────────────────────────────────────── */
 
   let lastTime = 0;
-  let resultShown = false;
-  let lastCountdownVal = -1;
-  window.gameSpeed = 1.0;
 
   function gameLoop(timestamp) {
     const dt = Math.min((timestamp - lastTime) / 1000, 0.05); // Cap dt at 50ms
     lastTime = timestamp;
 
+    // CombatManager handles countdown, speedMultiplier, finished delay internally.
+    // UI notifications come via onCountdownTick / onBattleEnd callbacks.
+    combatManager.update(dt);
+
+    // Thin orchestration: refresh HUD during fighting, render every frame
     const state = combatManager.getState();
-    const speedMultiplier = window.gameSpeed || 1.0;
-
-    // ── Update phase ──
-    if (state === 'countdown' || state === 'fighting') {
-      combatManager.update(dt * speedMultiplier);
-      resultShown = false;
-    }
-
-    // ── Countdown UI ──
-    if (state === 'countdown') {
-      const count = Math.ceil(combatManager.countdownTimer);
-      if (count !== lastCountdownVal) {
-        if (count > 0) {
-          uiManager.showCountdown(count);
-        } else {
-          uiManager.showCountdown('FIGHT!');
-          setTimeout(() => uiManager.hideCountdown(), 500);
-        }
-        lastCountdownVal = count;
-      }
-    } else {
-      lastCountdownVal = -1;
-    }
-
-    // ── HUD update ──
     if (state === 'fighting') {
       uiManager.updateHUD(combatManager.fightersLeft, combatManager.fightersRight);
     }
-
-    // ── Finished ──
-    if (state === 'finished' && !resultShown) {
-      combatManager.update(dt); // continue rendering remaining effects
-      uiManager.updateHUD(combatManager.fightersLeft, combatManager.fightersRight);
-      setTimeout(() => {
-        uiManager.showResult(combatManager.getWinner(), combatManager.getBattleTime());
-      }, 1500);
-      resultShown = true;
-    }
-
-    // ── Render ──
     if (state !== 'waiting') {
       combatManager.render();
     }

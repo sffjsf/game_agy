@@ -6,7 +6,7 @@ export function executeStun(caster, skill, weaponSystem, effectSystem, dx, dy, d
 {
   if (caster.target.isAlive() && dist <= skill.range) {
     caster.target.takeDamage(skill.damage, caster.x, caster.y, effectSystem);
-    caster.target.stunTimer = skill.duration; // Apply stun!
+    caster.target.applyStun(skill.duration);
     EffectLib.addStunEffect(effectSystem, caster.target.x, caster.target.y, '#FFD700', 30);
     effectSystem.screenShake(6);
   }

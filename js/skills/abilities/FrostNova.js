@@ -8,7 +8,7 @@ export function executeFrostNova(caster, skill, weaponSystem, effectSystem, dx, 
   EffectLib.addSlowEffect(effectSystem, caster.x, caster.y, '#4FC3F7', area);
   EffectLib.addAoeMeleeEffect(effectSystem, caster.x, caster.y, '#B3E5FC', area);
   effectSystem.screenShake(4);
-  const opposingTeam = caster.team === 'left' ? caster.combatManager.fightersRight : caster.combatManager.fightersLeft;
+  const opposingTeam = caster._opposingTeam;
   if (opposingTeam) {
     opposingTeam.forEach(enemy => {
       if (!enemy.isAlive()) return;

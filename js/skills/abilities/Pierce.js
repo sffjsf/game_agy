@@ -9,7 +9,7 @@ export function executePierce(caster, skill, weaponSystem, effectSystem, dx, dy,
   const dirX = dx / dist;
   const dirY = dy / dist;
   EffectLib.addMultiShotEffect(effectSystem, caster.x, caster.y, caster.charData.color, 35);
-  const opposingTeam = caster.team === 'left' ? caster.combatManager.fightersRight : caster.combatManager.fightersLeft;
+  const opposingTeam = caster._opposingTeam;
   if (opposingTeam) {
     opposingTeam.forEach(enemy => {
       if (!enemy.isAlive()) return;

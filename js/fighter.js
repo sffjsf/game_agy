@@ -4,10 +4,12 @@ import { FighterAI } from './ai/FighterAI.js';
 import { executeSkillStrategy } from './skills/SkillRegistry.js';
 import { characterData } from './characters/index.js';
 import { soundSystem } from './audio.js';
+import { safeFinite, safeDirection, clamp, normaliseAngle } from './utils.js';
+import { BuffManager } from './buffs/BuffManager.js';
 
 /**
  * fighter.js - Fighter Class for 2D Auto-Battle Game
- * 
+ *
  * Handles individual unit AI, states (chase, attack, skill), rendering,
  * and massive switch statements for different character skills.
  */
@@ -47,16 +49,8 @@ export class Fighter {
     this.skillReady = false;
     this.attackExecuted = false;    // Flag to ensure attack fires once per state
 
-    // Debuff timers
-    this.stunTimer = 0;
-    this.slowTimer = 0;
-    this.poisonTimer = 0;
-    this.poisonDps = 0;
-    this.poisonTickTimer = 0;
-    this.poisonTrailTimer = 0;
-    this.burnTimer = 0;
-    this.burnDps = 0;
-    this.burnTickTimer = 0;
+    // Debuff manager (stun / slow / poison / burn)
+    this.buffs = new BuffManager(this);
 
     // Movement pattern state
     this.moveTimer = 0;
@@ -134,41 +128,14 @@ export class Fighter {
     this.target = enemy;
   }
 
-  /**
-   * Apply stun debuff.
-   * @param {number} duration - Stun duration in seconds
-   */
-  applyStun(duration) {
-    this.stunTimer = Math.max(this.stunTimer, duration);
-  }
-
-  /**
-   * Apply slow debuff.
-   * @param {number} duration - Slow duration in seconds
-   */
-  applySlow(duration) {
-    this.slowTimer = Math.max(this.slowTimer, duration);
-  }
-
-  /**
-   * Apply poison damage over time.
-   * @param {number} duration - Poison duration in seconds
-   * @param {number} dps - Damage per second
-   */
-  applyPoison(duration, dps) {
-    this.poisonTimer = Math.max(this.poisonTimer, duration);
-    this.poisonDps = Math.max(this.poisonDps || 0, dps || 0);
-  }
-
-  /**
-   * Apply burn damage over time.
-   * @param {number} duration - Burn duration in seconds
-   * @param {number} dps - Damage per second
-   */
-  applyBurn(duration, dps) {
-    this.burnTimer = Math.max(this.burnTimer, duration);
-    this.burnDps = Math.max(this.burnDps || 0, dps || 0);
-  }
+  // Debuff application — delegate to BuffManager
+  applyStun(duration)           { this.buffs.applyStun(duration); }
+  applySlow(duration)           { this.buffs.applySlow(duration); }
+  applyPoison(duration, dps)    { this.buffs.applyPoison(duration, dps); }
+  applyBurn(duration, dps)      { this.buffs.applyBurn(duration, dps); }
+  isStunned()                   { return this.buffs.isStunned(); }
+  isSlowed()                    { return this.buffs.isSlowed(); }
+  isBurning()                   { return this.buffs.isBurning(); }
 
   // ═══════════════════════════════════════════════════════════════
   // MAIN UPDATE LOOP
@@ -183,18 +150,28 @@ export class Fighter {
    * @param {number} arenaHeight - Arena height in pixels
    * @param {number} arenaX - Arena left offset (optional, default 0)
    * @param {number} arenaY - Arena top offset (optional, default 0)
+   * @param {Fighter[]} opposingTeam - Enemy team fighters
+   * @param {Fighter[]} ownTeam - Friendly team fighters
+   * @param {{addPoisonZone: Function, applyAreaDamage: Function}} battleCallbacks - Cross-cutting callbacks
    */
-  update(dt, weaponSystem, effectSystem, arenaWidth, arenaHeight, arenaX, arenaY, opposingTeam) {
+  update(dt, weaponSystem, effectSystem, arenaWidth, arenaHeight, arenaX, arenaY, opposingTeam, ownTeam, battleCallbacks) {
     arenaX = arenaX || 0;
     arenaY = arenaY || 0;
     arenaWidth = arenaWidth || 800;
     arenaHeight = arenaHeight || 500;
 
+    // Transient battle context — set each frame so passives/skills never need combatManager
+    this._opposingTeam = opposingTeam || [];
+    this._ownTeam = ownTeam || [];
+    this._weaponSystem = weaponSystem;
+    this._addPoisonZone = (battleCallbacks && battleCallbacks.addPoisonZone) || null;
+    this._applyAreaDamage = (battleCallbacks && battleCallbacks.applyAreaDamage) || null;
+
     // Sanitize state variables at start of update to prevent NaN propagation
-    if (typeof this.x !== 'number' || !isFinite(this.x)) this.x = arenaX + arenaWidth / 2;
-    if (typeof this.y !== 'number' || !isFinite(this.y)) this.y = arenaY + arenaHeight / 2;
-    if (typeof this.hp !== 'number' || !isFinite(this.hp)) this.hp = this.maxHp;
-    if (typeof this.angle !== 'number' || !isFinite(this.angle)) this.angle = this.team === 'left' ? 0 : Math.PI;
+    this.x  = safeFinite(this.x, arenaX + arenaWidth / 2);
+    this.y  = safeFinite(this.y, arenaY + arenaHeight / 2);
+    this.hp  = safeFinite(this.hp, this.maxHp);
+    this.angle = normaliseAngle(this.angle);
 
     // Dead fighters don't update beyond death animation
     if (!this.alive && this.state !== 'dead') return;
@@ -204,19 +181,15 @@ export class Fighter {
 
     // ── Update all timers ──
     this.stateTimer += dt;
-    var attackTimerRate = (this.slowTimer > 0) ? 0.6 : 1.0;
+    var attackTimerRate = this.buffs.slowAttackRate();
     this.attackTimer = Math.max(0, this.attackTimer - dt * attackTimerRate);
     this.skillCooldown = Math.max(0, this.skillCooldown - dt);
-    this.stunTimer = Math.max(0, this.stunTimer - dt);
-    this.slowTimer = Math.max(0, this.slowTimer - dt);
-    this.updatePoison(dt, effectSystem);
-    this.updateBurn(dt, effectSystem);
-    this.updatePoisonTrail(dt, effectSystem);
+    this.buffs.update(dt, effectSystem);
     this.hitFlashTimer = Math.max(0, this.hitFlashTimer - dt);
     this.blinkCooldown = Math.max(0, this.blinkCooldown - dt);
     this.cloneTimer = Math.max(0, this.cloneTimer - dt);
     this.heavenlyEyeCooldown = Math.max(0, (this.heavenlyEyeCooldown || 0) - dt);
-    this.skillReady = (this.skillCooldown <= 0) && (this.poisonTimer <= 0);
+    this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 
     this.updatePassiveTimers(dt);
     this.updateAutomaticPassives(opposingTeam, effectSystem);
@@ -227,29 +200,24 @@ export class Fighter {
     }
 
     // ── Stunned: skip all actions ──
-    if (this.stunTimer > 0) {
-      // Still clamp coordinates and sanitize!
-      if (typeof this.x !== 'number' || !isFinite(this.x)) this.x = arenaX + arenaWidth / 2;
-      if (typeof this.y !== 'number' || !isFinite(this.y)) this.y = arenaY + arenaHeight / 2;
-      this.x = Math.max(arenaX + 30, Math.min(arenaX + arenaWidth - 30, this.x));
-      this.y = Math.max(arenaY + 30, Math.min(arenaY + arenaHeight - 30, this.y));
+    if (this.buffs.isStunned()) {
+      this.x = clamp(this.x, arenaX + 30, arenaX + arenaWidth - 30);
+      this.y = clamp(this.y, arenaY + 30, arenaY + arenaHeight - 30);
       return;
     }
 
     // ── Update facing angle toward target ──
     if (this.target && this.target.isAlive()) {
-      if (isFinite(this.target.x) && isFinite(this.target.y) && isFinite(this.x) && isFinite(this.y)) {
-        let dx = this.target.x - this.x;
-        let dy = this.target.y - this.y;
-        // Prevent frantic spinning due to collision jitter when overlapping
-        if (dx * dx + dy * dy > 10.0) {
-          this.angle = Math.atan2(dy, dx);
-        }
+      const faceDir = safeDirection(
+        this.target.x - this.x,
+        this.target.y - this.y
+      );
+      // Prevent frantic spinning due to collision jitter when overlapping
+      if (faceDir.dist * faceDir.dist > 10.0) {
+        this.angle = Math.atan2(faceDir.dy * faceDir.dist, faceDir.dx * faceDir.dist);
       }
     }
-    if (typeof this.angle !== 'number' || !isFinite(this.angle)) {
-      this.angle = this.team === 'left' ? 0 : Math.PI;
-    }
+    this.angle = normaliseAngle(this.angle);
 
     // Skills have absolute priority: cast immediately once ready and in range.
     if (this.canCastSkillNow()) {
@@ -459,29 +427,19 @@ export class Fighter {
     }
 
     // ── Clamp position to arena bounds & sanitize NaN ──
-    if (typeof this.x !== 'number' || !isFinite(this.x)) {
-      this.x = arenaX + arenaWidth / 2;
-    }
-    if (typeof this.y !== 'number' || !isFinite(this.y)) {
-      this.y = arenaY + arenaHeight / 2;
-    }
-    if (typeof this.hp !== 'number' || !isFinite(this.hp)) {
-      this.hp = this.maxHp;
-    }
-    if (typeof this.angle !== 'number' || !isFinite(this.angle)) {
-      this.angle = this.team === 'left' ? 0 : Math.PI;
-    }
-    if (!isFinite(this.stunTimer)) this.stunTimer = 0;
-    if (!isFinite(this.slowTimer)) this.slowTimer = 0;
-    if (!isFinite(this.poisonTimer)) this.poisonTimer = 0;
-    if (!isFinite(this.poisonDps)) this.poisonDps = 0;
-    if (!isFinite(this.burnTimer)) this.burnTimer = 0;
-    if (!isFinite(this.burnDps)) this.burnDps = 0;
-    if (!isFinite(this.attackTimer)) this.attackTimer = 0;
-    if (!isFinite(this.skillCooldown)) this.skillCooldown = 0;
+    this.x = clamp(this.x, arenaX + 30, arenaX + arenaWidth - 30);
+    this.y = clamp(this.y, arenaY + 30, arenaY + arenaHeight - 30);
+    // Reset to arena centre if coords are still non-finite (clamp returns min on NaN)
+    if (!isFinite(this.x)) this.x = arenaX + arenaWidth / 2;
+    if (!isFinite(this.y)) this.y = arenaY + arenaHeight / 2;
 
-    this.x = Math.max(arenaX + 30, Math.min(arenaX + arenaWidth - 30, this.x));
-    this.y = Math.max(arenaY + 30, Math.min(arenaY + arenaHeight - 30, this.y));
+    this.hp = safeFinite(this.hp, this.maxHp);
+    this.angle = normaliseAngle(this.angle);
+
+    // Timer cleanup
+    this.buffs.sanitise();
+    this.attackTimer   = safeFinite(this.attackTimer, 0);
+    this.skillCooldown = safeFinite(this.skillCooldown, 0);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -542,7 +500,8 @@ export class Fighter {
           this.team,
           this.charData.projectileType,
           this.charData.color,
-          this
+          this,
+          this._opposingTeam
         );
         if (soundSystem) soundSystem.playShootSound();
       }
@@ -632,41 +591,28 @@ export class Fighter {
   updateAI(dt, arenaWidth, arenaHeight) {
     if (!this.target || !this.target.isAlive()) return;
 
-    var dx = this.target.x - this.x;
-    var dy = this.target.y - this.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
-      dx = 0;
-      dy = 0;
-      dist = 1;
-    }
+    const dir = safeDirection(
+      this.target.x - this.x,
+      this.target.y - this.y
+    );
 
+    // AI tendency strategies
     switch (this.charData.aiTendency) {
       case 'aggressive':
         // No special behavior — charge in always
         break;
 
       case 'cautious':
-        // Retreat when low HP and enemy is close
-        if (this.hp < this.maxHp * 0.3 && dist < this.charData.attackRange * 1.2) {
-          // Move away from target slightly
-          if (dist > 1) {
-            this.x -= (dx / dist) * this.charData.speed * 30 * dt;
-            this.y -= (dy / dist) * this.charData.speed * 30 * dt;
-          }
+        if (this.hp < this.maxHp * 0.3 && dir.dist < this.charData.attackRange * 1.2) {
+          this.x -= dir.dx * this.charData.speed * 30 * dt;
+          this.y -= dir.dy * this.charData.speed * 30 * dt;
         }
         break;
 
       case 'balanced':
-        // Cautious when HP is low
-        if (this.hp <= this.maxHp * 0.5) {
-          if (dist < this.charData.attackRange * 0.8) {
-            // Slight retreat
-            if (dist > 1) {
-              this.x -= (dx / dist) * this.charData.speed * 15 * dt;
-              this.y -= (dy / dist) * this.charData.speed * 15 * dt;
-            }
-          }
+        if (this.hp <= this.maxHp * 0.5 && dir.dist < this.charData.attackRange * 0.8) {
+          this.x -= dir.dx * this.charData.speed * 15 * dt;
+          this.y -= dir.dy * this.charData.speed * 15 * dt;
         }
         break;
     }
@@ -681,10 +627,8 @@ export class Fighter {
     if (!this.target || !this.target.isAlive()) return false;
     if (this.state === 'skill' || this.state === 'dashing_skill' || this.state === 'dead') return false;
 
-    var dx = this.target.x - this.x;
-    var dy = this.target.y - this.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    return isFinite(dist) && dist <= this.charData.skill.range;
+    const dir = safeDirection(this.target.x - this.x, this.target.y - this.y);
+    return dir.dist <= this.charData.skill.range;
   }
 
   /**
@@ -733,67 +677,6 @@ export class Fighter {
   }
 
   /**
-   * Tick poison damage without interrupting movement every frame.
-   * @param {number} dt
-   * @param {EffectSystem} effectSystem
-   */
-  updatePoison(dt, effectSystem) {
-    if (this.poisonTimer <= 0 || !this.alive) return;
-
-    this.poisonTimer = Math.max(0, this.poisonTimer - dt);
-    this.poisonTickTimer -= dt;
-    if (this.poisonTickTimer <= 0) {
-      this.poisonTickTimer = 0.5;
-      effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 12, '中毒!', false, '#9C27B0');
-      EffectLib.addPoisonCloudEffect(effectSystem, this.x, this.y, '#9C27B0', 28);
-    }
-
-    if (this.poisonTimer <= 0) {
-      this.poisonTickTimer = 0;
-    }
-  }
-
-  /**
-   * Tick burn damage over time.
-   * @param {number} dt
-   * @param {EffectSystem} effectSystem
-   */
-  updateBurn(dt, effectSystem) {
-    if (this.burnTimer <= 0 || this.burnDps <= 0 || !this.alive) return;
-
-    this.burnTimer = Math.max(0, this.burnTimer - dt);
-    this.burnTickTimer -= dt;
-    if (this.burnTickTimer <= 0) {
-      this.burnTickTimer = 0.5;
-      this.takeDamage(this.burnDps * 0.5, this.x, this.y, effectSystem);
-      effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 16, '着火', false, '#FFAB00');
-      EffectLib.addFireBurstEffect(effectSystem, this.x, this.y, '#FF5722', 24);
-    }
-
-    if (this.burnTimer <= 0) {
-      this.burnDps = 0;
-      this.burnTickTimer = 0;
-    }
-  }
-
-  /**
-   * Poisoner passive: leaves short-lived poison clouds while moving.
-   * @param {number} dt
-   * @param {EffectSystem} effectSystem
-   */
-  updatePoisonTrail(dt, effectSystem) {
-    if (!this.hasPassive('poison_trail') || !this.alive || this.state === 'dead') return;
-    if (!this.combatManager || this.combatManager.state !== 'fighting') return;
-
-    this.poisonTrailTimer = Math.max(0, this.poisonTrailTimer - dt);
-    if (this.poisonTrailTimer > 0) return;
-
-    this.poisonTrailTimer = 0.85;
-    this.combatManager.addPoisonZone(this.x, this.y, this.team, 56, 3.2, 3.0, 0.8);
-    EffectLib.addPoisonCloudEffect(effectSystem, this.x, this.y, '#66BB6A', 42);
-  }
-
-  /**
    * Automatic passives that can trigger without taking or dealing damage.
    * @param {Fighter[]} opposingTeam
    * @param {EffectSystem} effectSystem
@@ -830,58 +713,36 @@ export class Fighter {
   takeDamage(damage, attackerX, attackerY, effectSystem) {
     if (!this.alive) return;
 
-    // Ensure this fighter's coordinates and health are valid
-    if (typeof this.x !== 'number' || !isFinite(this.x)) this.x = 400;
-    if (typeof this.y !== 'number' || !isFinite(this.y)) this.y = 300;
-    if (typeof this.hp !== 'number' || !isFinite(this.hp)) this.hp = this.maxHp;
-
-    // Ensure all incoming inputs are valid numbers to prevent NaN propagation
-    if (typeof damage !== 'number' || !isFinite(damage)) {
-      damage = 0;
-    }
-    if (typeof attackerX !== 'number' || !isFinite(attackerX)) {
-      attackerX = this.x;
-    }
-    if (typeof attackerY !== 'number' || !isFinite(attackerY)) {
-      attackerY = this.y;
-    }
+    // Sanitise all inputs once at the top
+    this.x  = safeFinite(this.x, 400);
+    this.y  = safeFinite(this.y, 300);
+    this.hp = safeFinite(this.hp, this.maxHp);
+    damage   = safeFinite(damage, 0);
+    attackerX = safeFinite(attackerX, this.x);
+    attackerY = safeFinite(attackerY, this.y);
 
     if (this.tryDamageAvoidancePassives(effectSystem)) return;
     damage = this.applyDamageReductionPassives(damage, effectSystem);
 
     if (damage <= 0) return;
 
-    const wasAlive = this.hp > 0;
     this.hp -= damage;
-    this.hp = Math.max(0, this.hp);
-
-    // Final safety: if hp is still somehow non-finite, reset it
-    if (!isFinite(this.hp)) {
-      console.warn('[NaN TRACE] hp became NaN after takeDamage! damage=', damage, 'charId=', this.charData.id, 'attackerX=', attackerX, 'attackerY=', attackerY);
-      this.hp = 0;
-    }
+    this.hp = clamp(this.hp, 0, this.maxHp);
 
     // Visual feedback
     this.hitFlashTimer = 0.15;
     effectSystem.addHitEffect(this.x, this.y, this.charData.color);
     const damageColor = this.team === 'left' ? '#FF5252' : '#29B6F6';
     effectSystem.addDamageNumber(this.x, this.y - this.charData.size, damage, false, damageColor);
-    
+
     // Play hit sound
     if (soundSystem) soundSystem.playHitSound();
 
     // Knockback (5-8px away from attacker)
-    var kbAngle = Math.atan2(this.y - attackerY, this.x - attackerX);
-    if (isNaN(kbAngle) || !isFinite(kbAngle)) kbAngle = 0;
+    const kb = safeDirection(this.x - attackerX, this.y - attackerY);
     var kbDist = 5 + Math.random() * 3;
-    
-    var nextX = this.x + Math.cos(kbAngle) * kbDist;
-    var nextY = this.y + Math.sin(kbAngle) * kbDist;
-    if (isFinite(nextX)) this.x = nextX;
-    if (isFinite(nextY)) this.y = nextY;
-
-    if (!isFinite(this.x)) this.x = attackerX;
-    if (!isFinite(this.y)) this.y = attackerY;
+    this.x += kb.dx * kbDist;
+    this.y += kb.dy * kbDist;
 
     // State transition
     if (this.hp <= 0) {
@@ -903,12 +764,8 @@ export class Fighter {
    */
   heal(amount, effectSystem) {
     if (!this.alive) return;
-    if (typeof amount !== 'number' || !isFinite(amount)) {
-      amount = 0;
-    }
-    this.hp = Math.min(this.maxHp, this.hp + amount);
-    // Final safety
-    if (!isFinite(this.hp)) this.hp = this.maxHp;
+    amount = safeFinite(amount, 0);
+    this.hp = clamp(this.hp + amount, 0, this.maxHp);
     effectSystem.addHealEffect(this.x, this.y);
   }
 
@@ -997,7 +854,7 @@ export class Fighter {
       EffectLib.addAoeMeleeEffect(effectSystem, this.x, this.y, '#FF1744', 130);
       effectSystem.screenShake(18);
 
-      const opposingTeam = (this.team === 'left') ? this.combatManager.fightersRight : this.combatManager.fightersLeft;
+      const opposingTeam = this._opposingTeam;
       if (opposingTeam) {
         opposingTeam.forEach(enemy => {
           if (enemy.isAlive()) {
@@ -1036,15 +893,6 @@ export class Fighter {
 
     var skill = this.charData.skill;
     this.startSkillCast(effectSystem, skill, skill.nameCN || skill.name);
-
-    var dx = this.target.x - this.x;
-    var dy = this.target.y - this.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    if (!isFinite(dx) || !isFinite(dy) || !isFinite(dist) || dist < 1) {
-      dx = 0;
-      dy = 0;
-      dist = 1;
-    }
 
     executeSkillStrategy(this, skill, weaponSystem, effectSystem);
   }
@@ -1124,81 +972,8 @@ export class Fighter {
       ctx.restore();
     }
 
-    // ── Slow effect (blue tint overlay) ──
-    if (this.slowTimer > 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.3;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.charData.size + 3, 0, Math.PI * 2);
-      ctx.fillStyle = '#42A5F5';
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // ── Poison effect (green bubbling ring) ──
-    if (this.poisonTimer > 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.35 + Math.sin(time * 8) * 0.1;
-      ctx.strokeStyle = '#76FF03';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.charData.size + 6, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = '#76FF03';
-      for (var p = 0; p < 3; p++) {
-        var pa = time * 2 + p * Math.PI * 2 / 3;
-        ctx.beginPath();
-        ctx.arc(this.x + Math.cos(pa) * (this.charData.size + 8), this.y + Math.sin(pa) * (this.charData.size + 8), 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    // ── Burn effect (orange flame ring) ──
-    if (this.burnTimer > 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.45 + Math.sin(time * 10) * 0.12;
-      ctx.strokeStyle = '#FFAB00';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.charData.size + 8, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = '#FF5722';
-      for (var b = 0; b < 4; b++) {
-        var ba = -time * 3 + b * Math.PI * 2 / 4;
-        ctx.beginPath();
-        ctx.arc(this.x + Math.cos(ba) * (this.charData.size + 9), this.y + Math.sin(ba) * (this.charData.size + 9), 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    // ── Stun effect (spinning stars above head) ──
-    if (this.stunTimer > 0) {
-      ctx.save();
-      var starCount = 3;
-      for (var i = 0; i < starCount; i++) {
-        var starAngle = time * 4 + (i / starCount) * Math.PI * 2;
-        var starX = this.x + Math.cos(starAngle) * 15;
-        var starY = this.y - this.charData.size - 12 + Math.sin(starAngle) * 5;
-
-        // Draw a small star
-        ctx.beginPath();
-        ctx.save();
-        ctx.translate(starX, starY);
-        for (var j = 0; j < 5; j++) {
-          var a = (j / 5) * Math.PI * 2 - Math.PI / 2;
-          var r = (j % 2 === 0) ? 5 : 2;
-          if (j === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-          else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-        }
-        ctx.closePath();
-        ctx.fillStyle = '#FFD700';
-        ctx.fill();
-        ctx.restore();
-      }
-      ctx.restore();
-    }
+    // ── Debuff overlays (slow / poison / burn / stun) ──
+    this.buffs.render(ctx, time);
 
     // ── Character decorations ──
     if (typeof this.charData.drawDecorations === 'function') {

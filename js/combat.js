@@ -2,6 +2,7 @@ import * as EffectLib from './effects_lib/index.js';
 import { Fighter } from './fighter.js';
 import { WeaponSystem } from './weapon.js';
 import { EffectSystem } from './effects.js';
+import { safeFinite, safeDirection } from './utils.js';
 
 /**
  * CombatManager - Orchestrates the entire battle
@@ -23,6 +24,18 @@ export class CombatManager {
     this.battleTime = 0;
     this.winner = null;
     this.waitTimer = 0;
+
+    /** Battle speed multiplier (set externally via speed slider). */
+    this.speedMultiplier = 1.0;
+
+    /** Observer callbacks — set by main.js to decouple UI from battle logic. */
+    this.onCountdownTick = null;  // ({count: number, type: 'number'|'fight'|'end'}) => void
+    this.onBattleEnd = null;      // (winner: string|null, battleTime: number) => void
+
+    /** Internal state for countdown dedup & finished delay. */
+    this._lastCountdownVal = 4;
+    this._finishedTimer = 0;
+    this._battleEndNotified = false;
 
     // Arena dimensions (updated on resize via main.js)
     this._computeArena();
@@ -67,7 +80,6 @@ export class CombatManager {
     for (let i = 0; i < numLeft; i++) {
       const y = startYLeft + i * spacing;
       const f = new Fighter(leftIds[i], spawnXLeft, y, 'left');
-      f.combatManager = this;
       this.fightersLeft.push(f);
     }
 
@@ -77,7 +89,6 @@ export class CombatManager {
     for (let i = 0; i < numRight; i++) {
       const y = startYRight + i * spacing;
       const f = new Fighter(rightIds[i], spawnXRight, y, 'right');
-      f.combatManager = this;
       this.fightersRight.push(f);
     }
 
@@ -92,26 +103,32 @@ export class CombatManager {
     this.battleTime = 0;
     this.winner = null;
     this.waitTimer = 0;
+    this._lastCountdownVal = 4;
+    this._finishedTimer = 0;
+    this._battleEndNotified = false;
   }
 
   /* ── Update ───────────────────────────────────────────── */
 
-  update(dt) {
+  update(rawDt) {
+    const dt = rawDt * this.speedMultiplier;
+
     if (this.state === 'countdown') {
-      this.countdownTimer -= dt;
-      if (this.countdownTimer <= 0) {
-        this.state = 'fighting';
-      }
+      this._tickCountdown(dt);
       return;
     }
 
     if (this.state === 'fighting') {
-      // Update left and right fighters
+      // Update left and right fighters — pass full context so fighters never need combatManager
+      const battleCallbacks = {
+        addPoisonZone: (...args) => this.addPoisonZone(...args),
+        applyAreaDamage: (x, y, ownerTeam, damage, radius, attacker) => this.applyAreaDamage(x, y, ownerTeam, damage, radius, attacker),
+      };
       this.fightersLeft.forEach(f => {
-        f.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY, this.fightersRight);
+        f.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY, this.fightersRight, this.fightersLeft, battleCallbacks);
       });
       this.fightersRight.forEach(f => {
-        f.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY, this.fightersLeft);
+        f.update(dt, this.weaponSystem, this.effectSystem, this.arenaWidth, this.arenaHeight, this.arenaX, this.arenaY, this.fightersLeft, this.fightersRight, battleCallbacks);
       });
 
       this.updatePoisonZones(dt);
@@ -140,27 +157,66 @@ export class CombatManager {
       this.effectSystem.update(dt);
 
       // Check death
-      const leftAlive = this.fightersLeft.some(f => f.isAlive());
-      const rightAlive = this.fightersRight.some(f => f.isAlive());
-
-      if (!leftAlive || !rightAlive) {
-        this.state = 'finished';
-        if (!leftAlive && !rightAlive) {
-          this.winner = null; // draw
-        } else {
-          this.winner = leftAlive ? 'left' : 'right';
-        }
-      }
+      this._checkBattleEnd();
 
       this.battleTime += dt;
-
-      // No battle time limit; battles go on until one side is defeated
       return;
     }
 
     if (this.state === 'finished') {
       // Let remaining effects play out
       this.effectSystem.update(dt);
+
+      // Delay before notifying result
+      this._finishedTimer -= dt;
+      if (this._finishedTimer <= 0 && !this._battleEndNotified) {
+        this._battleEndNotified = true;
+        if (this.onBattleEnd) {
+          this.onBattleEnd(this.winner, this.battleTime);
+        }
+      }
+    }
+  }
+
+  /** Emit countdown ticks to onCountdownTick callback when the display value changes. */
+  _tickCountdown(dt) {
+    this.countdownTimer -= dt;
+    const count = this.countdownTimer > 0 ? Math.ceil(this.countdownTimer) : 0;
+
+    if (count !== this._lastCountdownVal) {
+      this._lastCountdownVal = count;
+      if (!this.onCountdownTick) return;
+
+      if (count > 0) {
+        this.onCountdownTick({ count, type: 'number' });
+      } else {
+        this.onCountdownTick({ type: 'fight' });
+        // Signal UI to hide countdown after the fight flash
+        setTimeout(() => {
+          if (this.onCountdownTick) this.onCountdownTick({ type: 'end' });
+        }, 500);
+      }
+    }
+
+    if (this.countdownTimer <= 0) {
+      this.state = 'fighting';
+    }
+  }
+
+  /** Check if either team is wiped out and transition to finished. */
+  _checkBattleEnd() {
+    const leftAlive = this.fightersLeft.some(f => f.isAlive());
+    const rightAlive = this.fightersRight.some(f => f.isAlive());
+
+    if (!leftAlive || !rightAlive) {
+      this.state = 'finished';
+      this._finishedTimer = 1.5;
+      this._battleEndNotified = false;
+      if (!leftAlive && !rightAlive) {
+        this.winner = null; // draw
+      } else {
+        this.winner = leftAlive ? 'left' : 'right';
+      }
     }
   }
 
@@ -175,26 +231,25 @@ export class CombatManager {
       EffectLib.addStunEffect(this.effectSystem, hit.target.x, hit.target.y, '#FFD700', 30);
     }
 
-    if (projectile.type === 'bomb') {
-      this.applyAreaDamage(projectile.x, projectile.y, projectile.ownerId, hit.damage, 105, attacker);
-      EffectLib.addBombEffect(this.effectSystem, projectile.x, projectile.y, projectile.color, 105);
-      this.effectSystem.screenShake(6);
-      return;
-    }
+    // Type-based on-hit effects
+    switch (projectile.type) {
+      case 'bomb':
+        this.applyAreaDamage(projectile.x, projectile.y, projectile.ownerId, hit.damage, 105, attacker);
+        EffectLib.addBombEffect(this.effectSystem, projectile.x, projectile.y, projectile.color, 105);
+        this.effectSystem.screenShake(6);
+        return;
 
-    if (projectile.type === 'poison') {
-      hit.target.applyPoison(3.0, 3.5);
-      hit.target.applySlow(1.2);
-      EffectLib.addPoisonCloudEffect(this.effectSystem, hit.target.x, hit.target.y, projectile.color, 55);
+      case 'poison':
+        hit.target.applyPoison(3.0, 3.5);
+        hit.target.applySlow(1.2);
+        EffectLib.addPoisonCloudEffect(this.effectSystem, hit.target.x, hit.target.y, projectile.color, 55);
+        break;
     }
 
     if (!attacker || !attacker.isAlive()) return;
 
-    if (projectile.type === 'bat') {
-      attacker.healFromDamage(hit.damage, this.effectSystem, 1.0);
-    } else {
-      attacker.healFromDamage(hit.damage, this.effectSystem);
-    }
+    // Lifesteal from projectile hits
+    attacker.healFromDamage(hit.damage, this.effectSystem, projectile.type === 'bat' ? 1.0 : undefined);
   }
 
   applyAreaDamage(x, y, ownerTeam, damage, radius, attacker) {
@@ -203,10 +258,8 @@ export class CombatManager {
 
     targets.forEach(enemy => {
       if (!enemy.isAlive()) return;
-      const dx = enemy.x - x;
-      const dy = enemy.y - y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (isFinite(dist) && dist <= radius) {
+      const dir = safeDirection(enemy.x - x, enemy.y - y);
+      if (dir.dist <= radius) {
         enemy.takeDamage(damage, x, y, this.effectSystem);
         if (attacker && attacker.isAlive()) {
           attacker.healFromDamage(damage, this.effectSystem);
@@ -217,8 +270,8 @@ export class CombatManager {
 
   addPoisonZone(x, y, ownerTeam, radius, duration, poisonDps, slowDuration) {
     this.poisonZones.push({
-      x: x,
-      y: y,
+      x: safeFinite(x, 400),
+      y: safeFinite(y, 300),
       ownerTeam: ownerTeam,
       radius: radius,
       duration: duration,
@@ -242,10 +295,8 @@ export class CombatManager {
 
       enemies.forEach(enemy => {
         if (!enemy.isAlive()) return;
-        const dx = enemy.x - zone.x;
-        const dy = enemy.y - zone.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (isFinite(dist) && dist <= zone.radius) {
+        const dir = safeDirection(enemy.x - zone.x, enemy.y - zone.y);
+        if (dir.dist <= zone.radius) {
           enemy.applyPoison(Math.min(1.0, zone.duration), zone.poisonDps);
           if (zone.slowDuration > 0) enemy.applySlow(zone.slowDuration);
         }
@@ -262,32 +313,17 @@ export class CombatManager {
         const f1 = allFighters[i];
         const f2 = allFighters[j];
 
-        const dx = f2.x - f1.x;
-        const dy = f2.y - f1.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
+        const dir = safeDirection(f2.x - f1.x, f2.y - f1.y);
+
         // Combined radius * 0.75 to allow close combat but prevent overlapping
         const minDist = (f1.charData.size + f2.charData.size) * 0.75;
 
-        if (isFinite(dist) && dist < minDist) {
-          const overlap = minDist - dist;
-          const nx = dx / (dist || 1);
-          const ny = dy / (dist || 1);
-
-          // Push them apart by half the overlap each
-          const pushDist = overlap / 2;
-          
-          if (isFinite(pushDist) && isFinite(nx) && isFinite(ny)) {
-            const nextF1X = f1.x - nx * pushDist;
-            const nextF1Y = f1.y - ny * pushDist;
-            const nextF2X = f2.x + nx * pushDist;
-            const nextF2Y = f2.y + ny * pushDist;
-
-            if (isFinite(nextF1X)) f1.x = nextF1X;
-            if (isFinite(nextF1Y)) f1.y = nextF1Y;
-            if (isFinite(nextF2X)) f2.x = nextF2X;
-            if (isFinite(nextF2Y)) f2.y = nextF2Y;
-          }
+        if (dir.dist < minDist) {
+          const pushDist = (minDist - dir.dist) / 2;
+          f1.x -= dir.dx * pushDist;
+          f1.y -= dir.dy * pushDist;
+          f2.x += dir.dx * pushDist;
+          f2.y += dir.dy * pushDist;
         }
       }
     }

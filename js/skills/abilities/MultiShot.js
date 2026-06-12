@@ -14,6 +14,7 @@ export function executeMultiShot(caster, skill, weaponSystem, effectSystem, dx, 
     var vy = Math.sin(shotAngle) * speed;
     var proj = createProjectile(caster.x, caster.y, vx, vy, skill.damage, caster.team, caster.charData.color, 5, 'arrow');
     proj.attacker = caster;
+    proj.opposingTeam = caster._opposingTeam;
     weaponSystem.projectiles.push(proj);
   }
   EffectLib.addMultiShotEffect(effectSystem, caster.x, caster.y, caster.charData.color, 30);

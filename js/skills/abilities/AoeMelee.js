@@ -6,7 +6,7 @@ export function executeAoeMelee(caster, skill, weaponSystem, effectSystem, dx, d
 {
   EffectLib.addAoeMeleeEffect(effectSystem, caster.x, caster.y, caster.charData.color, skill.range);
   effectSystem.screenShake(6);
-  const opposingTeam = caster.team === 'left' ? caster.combatManager.fightersRight : caster.combatManager.fightersLeft;
+  const opposingTeam = caster._opposingTeam;
   if (opposingTeam) {
     opposingTeam.forEach(enemy => {
       if (enemy.isAlive()) {

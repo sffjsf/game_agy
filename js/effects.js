@@ -1,10 +1,8 @@
-
-    // Skill effects decoupled to effects_lib
 /**
  * effects.js - Visual Effects System for 2D Auto-Battle Game
- * 
+ *
  * Handles all visual effects: particles, damage numbers, trails, and screen shake.
- * No modules/imports - loaded via script tag.
+ * Skill effects decoupled to effects_lib/index.js.
  */
 
 export class EffectSystem {
