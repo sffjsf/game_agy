@@ -1,6 +1,7 @@
 export const train_conductor = {
     id: 'train_conductor',
-    name: 'Train Conductor',
+    isHero: true,
+  name: 'Train Conductor',
     nameCN: '列车长',
     color: '#1A237E',
     secondaryColor: '#FFD700',
@@ -19,11 +20,14 @@ export const train_conductor = {
     weaponType: 'ranged',
     projectileType: 'train',
     passives: [
-      { id: 'steam_whistle', name: '蒸汽鸣笛', description: '敌人靠近时自动击退并减速，6 秒冷却。' },
-      { id: 'train_stun', name: '铁轨震荡', description: '火车投射物命中时额外眩晕。' }
+      { id: 'steam_whistle', isHero: true,
+  name: '蒸汽鸣笛', description: '敌人靠近时自动击退并减速，6 秒冷却。' },
+      { id: 'train_stun', isHero: true,
+  name: '铁轨震荡', description: '火车投射物命中时额外眩晕。' }
     ],
     skill: {
-      name: '列车出站',
+      isHero: true,
+  name: '列车出站',
       nameEN: 'Train Stampede',
       cooldown: 10,
       damage: 35,

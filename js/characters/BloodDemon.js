@@ -1,6 +1,7 @@
 export const blood_demon = {
     id: 'blood_demon',
-    name: 'Blood Demon',
+    isHero: true,
+  name: 'Blood Demon',
     nameCN: '血魔',
     color: '#880E4F',
     secondaryColor: '#FF1744',
@@ -18,11 +19,14 @@ export const blood_demon = {
     weaponType: 'melee',
     projectileType: null,
     passives: [
-      { id: 'lifesteal', name: '鲜血汲取', description: '造成伤害时回复 40% 伤害值的生命。' },
-      { id: 'blood_shield', name: '血红护盾', description: '低生命受击时生成 35 点护盾，15 秒冷却。' }
+      { id: 'lifesteal', isHero: true,
+  name: '鲜血汲取', description: '造成伤害时回复 40% 伤害值的生命。' },
+      { id: 'blood_shield', isHero: true,
+  name: '血红护盾', description: '低生命受击时生成 35 点护盾，15 秒冷却。' }
     ],
     skill: {
-      name: '蝙蝠召唤',
+      isHero: true,
+  name: '蝙蝠召唤',
       nameEN: 'Summon Bats',
       cooldown: 8,
       damage: 22,

@@ -1,6 +1,7 @@
 export const super_summoner = {
     id: 'super_summoner',
-    name: 'Superhero Summoner',
+    isHero: true,
+  name: 'Superhero Summoner',
     nameCN: '超级召唤师',
     color: '#9C27B0',
     secondaryColor: '#E040FB',
@@ -19,10 +20,12 @@ export const super_summoner = {
     weaponType: 'ranged',
     projectileType: 'homing_orb',
     passives: [
-      { id: 'summoner_attack', name: '石像役使', description: '普通攻击改为召唤一名短命石像。' }
+      { id: 'summoner_attack', isHero: true,
+  name: '石像役使', description: '普通攻击改为召唤一名短命石像。' }
     ],
     skill: {
-      name: '地狱军团',
+      isHero: true,
+  name: '地狱军团',
       nameEN: 'Summon Legion',
       cooldown: 7,
       damage: 0,

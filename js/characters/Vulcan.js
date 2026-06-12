@@ -1,6 +1,7 @@
 export const vulcan = {
     id: 'vulcan',
-    name: 'Vulcan',
+    isHero: true,
+  name: 'Vulcan',
     nameCN: '火神',
     color: '#FF5722',
     secondaryColor: '#FFD54F',
@@ -18,15 +19,20 @@ export const vulcan = {
     weaponType: 'melee',
     projectileType: null,
     passives: [
-      { id: 'fire_cone_basic', name: '神焰吐息', description: '普通攻击改为扇形放火，使敌人进入着火状态。' },
-      { id: 'inferno_rebirth', name: '浴火重生', description: '每场战斗首次受到致命伤害时恢复 45 生命，并点燃周围敌人。' }
+      { id: 'fire_cone_basic', isHero: true,
+  name: '神焰吐息', description: '普通攻击改为扇形放火，使敌人进入着火状态。' },
+      { id: 'inferno_rebirth', isHero: true,
+  name: '浴火重生', description: '每场战斗首次受到致命伤害时恢复 45 生命，并点燃周围敌人。' }
     ],
     specialEffects: [
-      { name: '着火状态', description: '着火敌人会持续扣血，并成为火神技能的爆炸核心。' },
-      { name: '连锁爆燃', description: '技能会引爆场上所有着火敌人及其四周区域。' }
+      { isHero: true,
+  name: '着火状态', description: '着火敌人会持续扣血，并成为火神技能的爆炸核心。' },
+      { isHero: true,
+  name: '连锁爆燃', description: '技能会引爆场上所有着火敌人及其四周区域。' }
     ],
     skill: {
-      name: '天火爆燃',
+      isHero: true,
+  name: '天火爆燃',
       nameEN: 'Inferno Detonation',
       cooldown: 9,
       damage: 34,

@@ -1,6 +1,7 @@
 export const one_punch_man = {
     id: 'one_punch_man',
-    name: 'One Punch Man',
+    isHero: true,
+  name: 'One Punch Man',
     nameCN: '一拳超人',
     color: '#FFEB3B',
     secondaryColor: '#D32F2F',
@@ -18,11 +19,14 @@ export const one_punch_man = {
     weaponType: 'melee',
     projectileType: null,
     passives: [
-      { id: 'saitama_dodge', name: '直觉闪避', description: '受到伤害时有 35% 概率闪避。' },
-      { id: 'saitama_splash', name: '拳风余波', description: '普通攻击命中时造成小范围溅射。' }
+      { id: 'saitama_dodge', isHero: true,
+  name: '直觉闪避', description: '受到伤害时有 35% 概率闪避。' },
+      { id: 'saitama_splash', isHero: true,
+  name: '拳风余波', description: '普通攻击命中时造成小范围溅射。' }
     ],
     skill: {
-      name: '认真一拳',
+      isHero: true,
+  name: '认真一拳',
       nameEN: 'Serious Punch',
       cooldown: 14,
       damage: 80,

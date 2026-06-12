@@ -105,7 +105,7 @@ export class UIManager {
     card.appendChild(stats);
 
     // Hero badge for superheroes
-    const isHero = (charId === 'one_punch_man' || charId === 'blood_demon' || charId === 'train_conductor' || charId === 'super_summoner' || charId === 'vulcan');
+    const isHero = char.isHero;
     if (isHero) {
       const badge = document.createElement('div');
       badge.className = 'hero-badge';
@@ -479,7 +479,7 @@ export class UIManager {
         </div>
       `;
       
-      const isHero = (id === 'one_punch_man' || id === 'blood_demon' || id === 'train_conductor' || id === 'super_summoner' || id === 'vulcan');
+      const isHero = char.isHero;
       const badgeHtml = isHero ? '<div class="hero-badge" style="top: 8px; left: 8px; font-size: 12px; padding: 4px 8px;">⭐ 英雄</div>' : '';
 
       card.innerHTML = `
