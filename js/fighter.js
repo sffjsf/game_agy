@@ -1064,19 +1064,24 @@ export class Fighter {
     ctx.save();
 
     // ── Foot ground indicator ring (for team color) ──
+    const teamColor = this.team === 'left' ? '#00E5FF' : '#FF3D00';
+    
     ctx.save();
-    ctx.globalAlpha = 0.25;
-    ctx.fillStyle = this.team === 'left' ? '#00E5FF' : '#FF3D00';
+    // Solid base
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = teamColor;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.charData.size * 1.3, 0, Math.PI * 2);
+    ctx.arc(this.x, this.y, this.charData.size * 1.5, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 0.6;
-    ctx.strokeStyle = this.team === 'left' ? '#00E5FF' : '#FF3D00';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 4]); // Dashed ring
+    // Thick glowing border
+    ctx.globalAlpha = 1.0;
+    ctx.shadowColor = teamColor;
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = teamColor;
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.charData.size * 1.3, 0, Math.PI * 2);
+    ctx.arc(this.x, this.y, this.charData.size * 1.5, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
 
