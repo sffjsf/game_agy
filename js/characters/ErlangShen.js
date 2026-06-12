@@ -7,7 +7,7 @@ export const erlang_shen = {
   weaponType: 'melee',
   movePattern: 'dash', // Aggressive dash
   attackPower: 20,
-  attackSpeed: 1.2,
+  attackSpeed: 1.0,
   attackRange: 90, // Longer melee reach for his lance
   chargeTime: 0.25,
   size: 34,
@@ -20,7 +20,7 @@ export const erlang_shen = {
   skill: {
     name: '放肆！啸天犬',
     type: 'summon_hound',
-    cooldown: 14,
+    cooldown: 6,
     range: 400,
     damage: 0,
     duration: 0,

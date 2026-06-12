@@ -328,3 +328,24 @@ export function addSlowEffect(effectSystem, x, y, color, radius) {
   
 }
 
+
+export function addWhistleEffect(effectSystem, x, y, color, radius) {
+  // Steam burst effect
+  for (var i = 0; i < 20; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var speed = 50 + Math.random() * 100;
+    effectSystem.addParticle({
+      x: x + Math.cos(angle) * 20,
+      y: y + Math.sin(angle) * 20,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.5,
+      maxLife: 0.5,
+      color: '#ECEFF1',
+      size: 4 + Math.random() * 4,
+      gravity: -20, // Float up like steam
+      friction: 0.90,
+      type: 'circle'
+    });
+  }
+}

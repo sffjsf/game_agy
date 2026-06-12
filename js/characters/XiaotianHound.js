@@ -7,7 +7,7 @@ export const xiaotian_hound = {
   weaponType: 'melee',
   movePattern: 'dash', // Extremely fast dash
   attackPower: 8,
-  attackSpeed: 2.0, // Bites very fast
+  attackSpeed: 0.4, // Bites very fast
   attackRange: 55, // Close combat bite
   chargeTime: 0.15,
   size: 26,
@@ -28,6 +28,7 @@ export const xiaotian_hound = {
   },
   passives: [
     {
+      id: 'hound_bite',
       type: 'hound_bite',
       name: '撕咬',
       description: '每次攻击都会死死咬住敌人，使其移动速度和攻击速度降低40%，持续2秒。'

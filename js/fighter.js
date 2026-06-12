@@ -204,7 +204,8 @@ export class Fighter {
 
     // ── Update all timers ──
     this.stateTimer += dt;
-    this.attackTimer = Math.max(0, this.attackTimer - dt);
+    var attackTimerRate = (this.slowTimer > 0) ? 0.6 : 1.0;
+    this.attackTimer = Math.max(0, this.attackTimer - dt * attackTimerRate);
     this.skillCooldown = Math.max(0, this.skillCooldown - dt);
     this.stunTimer = Math.max(0, this.stunTimer - dt);
     this.slowTimer = Math.max(0, this.slowTimer - dt);
