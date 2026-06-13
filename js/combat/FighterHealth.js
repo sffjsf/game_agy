@@ -15,6 +15,12 @@ export class FighterHealth {
     attackerY = safeFinite(attackerY, f.y);
 
     if (FighterHealth.tryDamageAvoidancePassives(f, effectSystem)) return;
+
+    // Acid corrosion: +30% damage taken
+    if (f.corrosionTimer > 0) {
+      damage *= 1.30;
+    }
+
     damage = FighterHealth.applyDamageReductionPassives(f, damage, effectSystem, attackerX, attackerY);
 
     if (damage <= 0) return;

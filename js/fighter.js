@@ -121,6 +121,7 @@ export class Fighter {
     this.dawnSpeedTimer = 0;
     this.dawnResurrectionCooldown = 0;
     this.finalSunriseUsed = false;
+    this.corrosionTimer = 0;
 
     // Channeling skill state (e.g. Berserker whirlwind)
     this.channelTimer = 0;
@@ -214,6 +215,7 @@ export class Fighter {
     this.smokeDodgeTimer = Math.max(0, (this.smokeDodgeTimer || 0) - dt);
     this.dawnSpeedTimer = Math.max(0, (this.dawnSpeedTimer || 0) - dt);
     this.dawnResurrectionCooldown = Math.max(0, (this.dawnResurrectionCooldown || 0) - dt);
+    this.corrosionTimer = Math.max(0, (this.corrosionTimer || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 
     this.updatePassiveTimers(dt);
@@ -492,6 +494,7 @@ export class Fighter {
     this.buffs.sanitise();
     this.attackTimer   = safeFinite(this.attackTimer, 0);
     this.skillCooldown = safeFinite(this.skillCooldown, 0);
+    this.corrosionTimer = safeFinite(this.corrosionTimer, 0);
   }
 
   // ═══════════════════════════════════════════════════════════════

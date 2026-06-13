@@ -80,6 +80,21 @@ export class FighterRenderer {
     // ── Debuff overlays (slow / poison / burn / stun) ──
     f.buffs.render(ctx, time);
 
+    // ── Corrosion overlay (pulsing acid green dashed ring) ──
+    if (f.corrosionTimer > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.45 + Math.sin(time * 12) * 0.15;
+      ctx.strokeStyle = '#76FF03';
+      ctx.lineWidth = 3.5;
+      ctx.shadowColor = '#76FF03';
+      ctx.shadowBlur = 8;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.charData.size + 4.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // ── Character decorations ──
     if (typeof f.charData.drawDecorations === 'function') {
       f.charData.drawDecorations(ctx, f.x, f.y, f.angle, f.charData.size, time);
