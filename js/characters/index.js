@@ -35,6 +35,7 @@ import { guard } from './Guard.js';
 import { crossbowman } from './Crossbowman.js';
 import { herbalist } from './Herbalist.js';
 import { scout } from './Scout.js';
+import { thunder_scholar } from './ThunderScholar.js';
 
 /**
  * Required fields every character data object must have.
@@ -156,7 +157,8 @@ export const characterData = {
   chain_fighter,
   brawler,
   rogue,
-  dawn_goddess
+  dawn_goddess,
+  thunder_scholar
 };
 
 // ── Validate all characters on import (dev-only safety net) ──
