@@ -23,7 +23,7 @@ export class FighterAI {
     }
 
     // If current target is alive and we are already committed to an attack/skill, keep it
-    if (this.fighter.target && this.fighter.target.isAlive() &&
+    if (this.fighter.target && this.fighter.target.isAlive() && !(this.fighter.target.invisibleTimer > 0) &&
         (this.fighter.state === 'charge' || this.fighter.state === 'attack' || this.fighter.state === 'skill' || this.fighter.state === 'dashing_skill')) {
       return;
     }
@@ -46,7 +46,7 @@ export class FighterAI {
 
     for (let i = 0; i < opposingTeam.length; i++) {
       const enemy = opposingTeam[i];
-      if (enemy.isAlive()) {
+      if (enemy.isAlive() && !(enemy.invisibleTimer > 0)) {
         const dx = enemy.x - this.fighter.x;
         const dy = enemy.y - this.fighter.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -83,7 +83,7 @@ export class FighterAI {
 
     for (let i = 0; i < opposingTeam.length; i++) {
       const enemy = opposingTeam[i];
-      if (enemy.isAlive()) {
+      if (enemy.isAlive() && !(enemy.invisibleTimer > 0)) {
         if (enemy.hp < lowestHp) {
           lowestHp = enemy.hp;
           best = enemy;

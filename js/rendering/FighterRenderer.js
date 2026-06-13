@@ -16,6 +16,11 @@ export class FighterRenderer {
 
     ctx.save();
 
+    // Invisibility shroud (stealth alpha)
+    if (f.invisibleTimer > 0) {
+      ctx.globalAlpha = 0.20;
+    }
+
     // ── Foot ground indicator ring (for team color) ──
     const teamColor = f.team === 'left' ? '#00E5FF' : '#FF3D00';
 
@@ -92,6 +97,25 @@ export class FighterRenderer {
       ctx.beginPath();
       ctx.arc(f.x, f.y, f.charData.size + 4.5, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
+    }
+
+    // ── Bleed overlay (dripping blood droplets) ──
+    if (f.bleedTimer > 0) {
+      ctx.save();
+      ctx.fillStyle = '#C2185B'; // Deep crimson pink
+      const radius = f.charData.size;
+      for (let d = 0; d < 3; d++) {
+        const dropProgress = (time * 1.6 + d * 0.33) % 1.0;
+        const angle = d * Math.PI * 2 / 3;
+        const dx = Math.cos(angle) * radius;
+        // drops fall downwards (+Y direction)
+        const dy = Math.sin(angle) * radius + dropProgress * 14;
+
+        ctx.beginPath();
+        ctx.arc(f.x + dx, f.y + dy, 2.5 * (1 - dropProgress), 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }
 

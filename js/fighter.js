@@ -122,6 +122,12 @@ export class Fighter {
     this.dawnResurrectionCooldown = 0;
     this.finalSunriseUsed = false;
     this.corrosionTimer = 0;
+    this.invisibleTimer = 0;
+    this.bleedTimer = 0;
+    this.bleedStacks = 0;
+    this.bleedTick = 0;
+    this.shadowCloneSaveUsed = false;
+    this.ultInvincibilityTimer = 0;
 
     // Channeling skill state (e.g. Berserker whirlwind)
     this.channelTimer = 0;
@@ -216,7 +222,39 @@ export class Fighter {
     this.dawnSpeedTimer = Math.max(0, (this.dawnSpeedTimer || 0) - dt);
     this.dawnResurrectionCooldown = Math.max(0, (this.dawnResurrectionCooldown || 0) - dt);
     this.corrosionTimer = Math.max(0, (this.corrosionTimer || 0) - dt);
+    this.invisibleTimer = Math.max(0, (this.invisibleTimer || 0) - dt);
+    this.bleedTimer = Math.max(0, (this.bleedTimer || 0) - dt);
+    this.ultInvincibilityTimer = Math.max(0, (this.ultInvincibilityTimer || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
+
+    // Bleed tick logic
+    if (this.bleedTimer > 0 && this.alive && this.state !== 'dead') {
+      this.bleedTick = (this.bleedTick || 0) - dt;
+      if (this.bleedTick <= 0) {
+        this.bleedTick = 0.5; // Tick every 0.5 seconds
+        const bleedDmg = 3 * (this.bleedStacks || 1);
+        this.takeDamage(bleedDmg, this.x, this.y, effectSystem);
+        effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 18, '流血', false, '#E91E63');
+        
+        // Spawn tiny blood drops
+        effectSystem.addParticle({
+          x: this.x + (Math.random() - 0.5) * 15,
+          y: this.y + (Math.random() - 0.5) * 15,
+          vx: (Math.random() - 0.5) * 15,
+          vy: 20 + Math.random() * 30,
+          life: 0.35,
+          maxLife: 0.35,
+          color: '#880E4F',
+          size: 1.5 + Math.random() * 2,
+          gravity: 70,
+          friction: 0.98,
+          type: 'circle'
+        });
+      }
+    } else {
+      this.bleedStacks = 0;
+      this.bleedTick = 0;
+    }
 
     this.updatePassiveTimers(dt);
     this.updateAutomaticPassives(opposingTeam, effectSystem, dt);
@@ -495,6 +533,9 @@ export class Fighter {
     this.attackTimer   = safeFinite(this.attackTimer, 0);
     this.skillCooldown = safeFinite(this.skillCooldown, 0);
     this.corrosionTimer = safeFinite(this.corrosionTimer, 0);
+    this.invisibleTimer = safeFinite(this.invisibleTimer, 0);
+    this.bleedTimer = safeFinite(this.bleedTimer, 0);
+    this.ultInvincibilityTimer = safeFinite(this.ultInvincibilityTimer, 0);
   }
 
   // ═══════════════════════════════════════════════════════════════

@@ -1,6 +1,7 @@
 import * as Passives from '../skills/Passives.js';
 import { soundSystem } from '../audio.js';
 import { safeFinite, safeDirection, clamp } from '../utils.js';
+import * as EffectLib from '../effects_lib/index.js';
 
 export class FighterHealth {
   static takeDamage(f, damage, attackerX, attackerY, effectSystem) {
@@ -14,6 +15,12 @@ export class FighterHealth {
     attackerX = safeFinite(attackerX, f.x);
     attackerY = safeFinite(attackerY, f.y);
 
+    // Ult Invincibility check
+    if (f.ultInvincibilityTimer > 0) {
+      effectSystem.addDamageNumber(f.x, f.y - f.charData.size, '免伤!', false, '#9C27B0');
+      return;
+    }
+
     if (FighterHealth.tryDamageAvoidancePassives(f, effectSystem)) return;
 
     // Acid corrosion: +30% damage taken
@@ -24,6 +31,41 @@ export class FighterHealth {
     damage = FighterHealth.applyDamageReductionPassives(f, damage, effectSystem, attackerX, attackerY);
 
     if (damage <= 0) return;
+
+    // shadow_clone_save check
+    const targetHpThreshold = f.maxHp * 0.30;
+    if (f.hasPassive('shadow_clone_save') && f.hp - damage <= targetHpThreshold && !f.shadowCloneSaveUsed && f.alive) {
+      f.shadowCloneSaveUsed = true;
+
+      const ownTeam = f.battleContext && f.battleContext.ownTeam ? f.battleContext.ownTeam : null;
+      if (ownTeam) {
+        const clone = new f.constructor('shadow_clone', f.x, f.y, f.team);
+        clone.angle = f.angle;
+        clone.battleContext = f.battleContext;
+        ownTeam.push(clone);
+        EffectLib.addCloneEffect(effectSystem, f.x, f.y, f.charData.secondaryColor || '#9C27B0', 40);
+      }
+
+      const opposingTeam = f.battleContext && f.battleContext.opposingTeam
+        ? f.battleContext.opposingTeam.filter(e => e.isAlive())
+        : [];
+      if (opposingTeam.length > 0) {
+        const weakest = opposingTeam.slice().sort((a, b) => a.hp - b.hp)[0];
+        const angle = weakest.angle;
+        f.x = weakest.x - Math.cos(angle) * 55;
+        f.y = weakest.y - Math.sin(angle) * 55;
+        f.angle = angle;
+        EffectLib.addCloneEffect(effectSystem, f.x, f.y, f.charData.secondaryColor || '#9C27B0', 35);
+      }
+
+      f.invisibleTimer = 1.0;
+      damage = 0;
+      f.hp = Math.max(f.hp, targetHpThreshold);
+
+      effectSystem.addDamageNumber(f.x, f.y - f.charData.size, '残影遁避!', false, '#9C27B0');
+      if (soundSystem) soundSystem.playSkillSound();
+      return;
+    }
 
     f.hp -= damage;
     f.hp = clamp(f.hp, 0, f.maxHp);

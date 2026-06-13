@@ -27,6 +27,7 @@ import { executeSmokeBomb } from './abilities/SmokeBomb.js';
 import { executeMorningStarJudgment } from './abilities/MorningStarJudgment.js';
 import { executeChainLightning } from './abilities/ChainLightning.js';
 import { executeCorrosiveCloud } from './abilities/CorrosiveCloud.js';
+import { executeShadowbladeStorm } from './abilities/ShadowbladeStorm.js';
 import { safeFinite } from '../utils.js';
 
 /**
@@ -66,6 +67,7 @@ const skillExecutors = {
   morning_star_judgment: executeMorningStarJudgment,
   chain_lightning:    executeChainLightning,
   corrosive_cloud:    executeCorrosiveCloud,
+  shadowblade_storm:  executeShadowbladeStorm,
 };
 
 /**

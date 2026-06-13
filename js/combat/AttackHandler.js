@@ -70,6 +70,27 @@ export class AttackHandler {
           }
         }
 
+        // shadow_strike check (Blade Master backstab crit + bleed)
+        if (f.hasPassive('shadow_strike')) {
+          const fromTargetAngle = Math.atan2(f.y - f.target.y, f.x - f.target.x);
+          let backAngleDiff = fromTargetAngle - (f.target.angle + Math.PI);
+          while (backAngleDiff > Math.PI) backAngleDiff -= Math.PI * 2;
+          while (backAngleDiff < -Math.PI) backAngleDiff += Math.PI * 2;
+          const isBackstab = Math.abs(backAngleDiff) <= Math.PI * 0.45;
+          if (isBackstab) {
+            finalDamage *= 1.80; // 180% crit
+            f.target.bleedStacks = Math.min((f.target.bleedStacks || 0) + 1, 3);
+            f.target.bleedTimer = 3.0;
+            f.target.bleedTick = 0.5;
+            effectSystem.addDamageNumber(f.target.x, f.target.y - f.target.charData.size - 12, '影袭暴击!', true, '#9C27B0');
+            EffectLib.addBackstabEffect(effectSystem, f.target.x, f.target.y, f.charData.secondaryColor || '#9C27B0', 20);
+          } else {
+            f.target.bleedStacks = Math.min((f.target.bleedStacks || 0) + 1, 3);
+            f.target.bleedTimer = 3.0;
+            f.target.bleedTick = 0.5;
+          }
+        }
+
         // Rogue backstab: bonus damage when attacking from behind the target.
         // Smoke step also guarantees the next attack window can backstab, because
         // enemies constantly turn toward their target outside stun windows.

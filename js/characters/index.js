@@ -37,6 +37,8 @@ import { herbalist } from './Herbalist.js';
 import { scout } from './Scout.js';
 import { thunder_scholar } from './ThunderScholar.js';
 import { alchemist } from './Alchemist.js';
+import { blade_master } from './BladeMaster.js';
+import { shadow_clone } from './ShadowClone.js';
 
 /**
  * Required fields every character data object must have.
@@ -160,7 +162,9 @@ export const characterData = {
   rogue,
   dawn_goddess,
   thunder_scholar,
-  alchemist
+  alchemist,
+  blade_master,
+  shadow_clone
 };
 
 // ── Validate all characters on import (dev-only safety net) ──
