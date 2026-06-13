@@ -1,0 +1,229 @@
+import * as EffectLib from '../effects_lib/index.js';
+import { safeFinite, safeDirection } from '../utils.js';
+
+export class HazardZoneManager {
+  constructor() {
+    this.poisonZones = [];
+    this.gravityWells = [];
+    this.burnZones = [];
+  }
+
+  clear() {
+    this.poisonZones = [];
+    this.gravityWells = [];
+    this.burnZones = [];
+  }
+
+  addPoisonZone(x, y, ownerTeam, radius, duration, poisonDps, slowDuration) {
+    this.poisonZones.push({
+      x: safeFinite(x, 400),
+      y: safeFinite(y, 300),
+      ownerTeam: ownerTeam,
+      radius: radius,
+      duration: duration,
+      maxDuration: duration,
+      poisonDps: poisonDps || 3.0,
+      slowDuration: slowDuration || 0
+    });
+  }
+
+  addGravityWell(x, y, ownerTeam, radius, duration, damage) {
+    this.gravityWells.push({
+      x: safeFinite(x, 400),
+      y: safeFinite(y, 300),
+      ownerTeam: ownerTeam,
+      radius: radius || 130,
+      duration: duration || 2.5,
+      maxDuration: duration || 2.5,
+      damage: damage || 38
+    });
+  }
+
+  addBurnZone(x, y, ownerTeam, radius, duration, burnDps) {
+    this.burnZones.push({
+      x: safeFinite(x, 400),
+      y: safeFinite(y, 300),
+      ownerTeam: ownerTeam,
+      radius: radius || 40,
+      duration: duration || 2.0,
+      maxDuration: duration || 2.0,
+      burnDps: burnDps || 8.0
+    });
+  }
+
+  update(dt, battle) {
+    this.updatePoisonZones(dt, battle);
+    this.updateGravityWells(dt, battle);
+    this.updateBurnZones(dt, battle);
+  }
+
+  updatePoisonZones(dt, battle) {
+    for (let i = this.poisonZones.length - 1; i >= 0; i--) {
+      const zone = this.poisonZones[i];
+      zone.duration -= dt;
+      if (zone.duration <= 0) {
+        this.poisonZones.splice(i, 1);
+        continue;
+      }
+
+      const enemies = getEnemies(zone.ownerTeam, battle);
+      if (!enemies) continue;
+
+      enemies.forEach(enemy => {
+        if (!enemy.isAlive()) return;
+        const dir = safeDirection(enemy.x - zone.x, enemy.y - zone.y);
+        if (dir.dist <= zone.radius) {
+          enemy.applyPoison(Math.min(1.0, zone.duration), zone.poisonDps);
+          if (zone.slowDuration > 0) enemy.applySlow(zone.slowDuration);
+        }
+      });
+    }
+  }
+
+  updateGravityWells(dt, battle) {
+    const effectSystem = battle.effectSystem;
+
+    for (let i = this.gravityWells.length - 1; i >= 0; i--) {
+      const well = this.gravityWells[i];
+      well.duration -= dt;
+
+      if (Math.random() < 0.4) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = well.radius * (0.3 + Math.random() * 0.7);
+        const px = well.x + Math.cos(angle) * dist;
+        const py = well.y + Math.sin(angle) * dist;
+        const speed = 140;
+        const vx = -Math.sin(angle) * speed - Math.cos(angle) * 90;
+        const vy = Math.cos(angle) * speed - Math.sin(angle) * 90;
+
+        effectSystem.addParticle({
+          x: px,
+          y: py,
+          vx: vx,
+          vy: vy,
+          life: 0.4 + Math.random() * 0.3,
+          maxLife: 0.7,
+          color: '#FF6D00',
+          size: 2.0 + Math.random() * 2,
+          gravity: 0,
+          friction: 0.96,
+          type: 'circle'
+        });
+      }
+
+      if (Math.random() < 0.12) {
+        effectSystem.addParticle({
+          x: well.x,
+          y: well.y,
+          vx: 0,
+          vy: 0,
+          life: 0.25,
+          maxLife: 0.25,
+          color: '#3E2723',
+          size: 20 + Math.sin(Date.now() * 0.015) * 6,
+          gravity: 0,
+          friction: 1.0,
+          type: 'ring'
+        });
+      }
+
+      if (well.duration <= 0) {
+        battle.applyAreaDamage(well.x, well.y, well.ownerTeam, well.damage, well.radius, null);
+        EffectLib.addFireBurstEffect(effectSystem, well.x, well.y, '#FF6D00', well.radius);
+        effectSystem.screenShake(10);
+        this.gravityWells.splice(i, 1);
+        continue;
+      }
+
+      const enemies = getEnemies(well.ownerTeam, battle);
+      if (enemies) {
+        enemies.forEach(enemy => {
+          if (!enemy.isAlive()) return;
+          const dx = enemy.x - well.x;
+          const dy = enemy.y - well.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+          if (dist <= well.radius) {
+            enemy.applySlow(0.2, 0.5);
+
+            if (!enemy.hasPassive('stone_shell')) {
+              const pullPower = 150 * dt * (1 - dist / well.radius);
+              const pullAngle = Math.atan2(dy, dx);
+              enemy.x -= Math.cos(pullAngle) * pullPower;
+              enemy.y -= Math.sin(pullAngle) * pullPower;
+            }
+
+            if (Math.random() < 0.15) {
+              const pullAngle = Math.atan2(dy, dx);
+              effectSystem.addParticle({
+                x: enemy.x,
+                y: enemy.y,
+                vx: -Math.cos(pullAngle) * 250,
+                vy: -Math.sin(pullAngle) * 250,
+                life: 0.25,
+                maxLife: 0.25,
+                color: '#FF6D00',
+                size: 2,
+                gravity: 0,
+                friction: 0.95,
+                type: 'spark'
+              });
+            }
+          }
+        });
+      }
+    }
+  }
+
+  updateBurnZones(dt, battle) {
+    const effectSystem = battle.effectSystem;
+
+    for (let i = this.burnZones.length - 1; i >= 0; i--) {
+      const zone = this.burnZones[i];
+      zone.duration -= dt;
+      if (zone.duration <= 0) {
+        this.burnZones.splice(i, 1);
+        continue;
+      }
+
+      if (Math.random() < 0.25) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * zone.radius;
+        const px = zone.x + Math.cos(angle) * dist;
+        const py = zone.y + Math.sin(angle) * dist;
+
+        effectSystem.addParticle({
+          x: px,
+          y: py,
+          vx: (Math.random() - 0.5) * 20,
+          vy: -20 - Math.random() * 30,
+          life: 0.3 + Math.random() * 0.25,
+          maxLife: 0.55,
+          color: Math.random() < 0.6 ? '#FF3D00' : '#FFC400',
+          size: 2.0 + Math.random() * 2.5,
+          gravity: -60,
+          friction: 0.94,
+          type: 'spark'
+        });
+      }
+
+      const enemies = getEnemies(zone.ownerTeam, battle);
+      if (!enemies) continue;
+
+      enemies.forEach(enemy => {
+        if (!enemy.isAlive()) return;
+        const dx = enemy.x - zone.x;
+        const dy = enemy.y - zone.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+        if (dist <= zone.radius) {
+          enemy.applyBurn(1.0, zone.burnDps);
+        }
+      });
+    }
+  }
+}
+
+function getEnemies(ownerTeam, battle) {
+  return ownerTeam === 'left' ? battle.fightersRight : battle.fightersLeft;
+}

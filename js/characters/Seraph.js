@@ -8,7 +8,7 @@ export const seraph = {
     glowColor: 'rgba(255, 61, 0, 0.5)',
     size: 34,
     speed: 4.8,
-    hp: 130,
+    hp: 230,
     attackPower: 18,
     attackSpeed: 1.2,
     chargeTime: 0.3,
