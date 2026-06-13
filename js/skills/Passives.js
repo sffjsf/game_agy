@@ -182,7 +182,15 @@ export function tryDamageAvoidancePassives(fighter, effectSystem) {
     effectSystem.addHitEffect(fighter.x, fighter.y, '#FFFFFF');
     return true;
   }
-  
+
+  if (fighter.hasPassive('wind_walker') && Math.random() < 0.25) {
+    effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '御风!', false, '#B0E0E6');
+    effectSystem.addHitEffect(fighter.x, fighter.y, '#B0E0E6');
+    // Grant wind fury: +40% speed, +25% damage for 2.5s
+    fighter.windFuryTimer = 2.5;
+    return true;
+  }
+
   return false;
 }
 

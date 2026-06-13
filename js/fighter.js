@@ -104,6 +104,9 @@ export class Fighter {
     // Bounty Hunter mechanics
     this.bountyHunterStacks = 0;
 
+    // Wind Dancer mechanics
+    this.windFuryTimer = 0;
+
     // Channeling skill state (e.g. Berserker whirlwind)
     this.channelTimer = 0;
     this.channelTick = 0;
@@ -191,6 +194,7 @@ export class Fighter {
       this.spawnNameTimer = Math.max(0, this.spawnNameTimer - dt);
     }
     this.heavenlyEyeCooldown = Math.max(0, (this.heavenlyEyeCooldown || 0) - dt);
+    this.windFuryTimer = Math.max(0, (this.windFuryTimer || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 
     this.updatePassiveTimers(dt);
@@ -809,6 +813,23 @@ export class Fighter {
     let mult = this.isSlowed() ? 0.5 : 1.0;
     // Blood rage: +25% move speed when HP below 35%
     if (this.hasPassive('blood_rage') && this.hp < this.maxHp * 0.35) {
+      mult *= 1.25;
+    }
+    // Wind fury: +40% move speed
+    if (this.windFuryTimer > 0) {
+      mult *= 1.4;
+    }
+    return mult;
+  }
+
+  /**
+   * Get outgoing damage multiplier from passives (e.g. wind fury).
+   * @returns {number}
+   */
+  getOutgoingDamageMultiplier() {
+    let mult = 1.0;
+    // Wind fury: +25% damage
+    if (this.windFuryTimer > 0) {
       mult *= 1.25;
     }
     return mult;

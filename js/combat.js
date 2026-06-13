@@ -164,6 +164,11 @@ export class CombatManager {
           }
         }
 
+        // Apply outgoing damage multiplier (e.g. wind fury)
+        if (attacker && attacker.getOutgoingDamageMultiplier) {
+          hit.damage *= attacker.getOutgoingDamageMultiplier();
+        }
+
         hit.target.takeDamage(hit.damage, hitX, hitY, this.effectSystem);
 
         // Bounty mark: on-kill permanent attack speed boost (max 25 stacks)

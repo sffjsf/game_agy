@@ -55,6 +55,9 @@ export class AttackHandler {
           }
         }
 
+        // Apply outgoing damage multiplier (e.g. wind fury)
+        finalDamage *= f.getOutgoingDamageMultiplier();
+
         f.applyMeleeHitPassives(finalDamage, f.target, effectSystem);
         f.target.takeDamage(finalDamage, f.x, f.y, effectSystem);
         f.healFromDamage(finalDamage, effectSystem);
@@ -101,6 +104,11 @@ export class AttackHandler {
     f.startSkillCast(effectSystem, skill, skill.nameCN || skill.name);
 
     executeSkillStrategy(f, skill, weaponSystem, effectSystem);
+
+    // Wind walker: gain wind fury after using any skill
+    if (f.hasPassive('wind_walker')) {
+      f.windFuryTimer = 2.5;
+    }
   }
 
   /**
@@ -162,6 +170,47 @@ export class AttackHandler {
           }
         });
       }
+    } else if (f.dashSkillType === 'gale_dash') {
+      // Wind Dancer: line damage along dash path + wind fury buff
+      const startX = f.dashStartX;
+      const startY = f.dashStartY;
+      const endX = f.dashTargetX;
+      const endY = f.dashTargetY;
+
+      const pathDx = endX - startX;
+      const pathDy = endY - startY;
+      const pathLen = Math.sqrt(pathDx * pathDx + pathDy * pathDy) || 1;
+
+      // Damage all enemies along the dash path (distance threshold 45px)
+      const opposingTeam = ctx.opposingTeam;
+      if (opposingTeam) {
+        opposingTeam.forEach(enemy => {
+          if (enemy.isAlive()) {
+            const ex = enemy.x;
+            const ey = enemy.y;
+
+            let t = ((ex - startX) * pathDx + (ey - startY) * pathDy) / (pathLen * pathLen);
+            t = Math.max(0, Math.min(1, t));
+            const closestX = startX + t * pathDx;
+            const closestY = startY + t * pathDy;
+            const distToPath = Math.sqrt((ex - closestX) * (ex - closestX) + (ey - closestY) * (ey - closestY));
+
+            if (distToPath <= 45) {
+              enemy.takeDamage(skill.damage, f.x, f.y, effectSystem);
+              effectSystem.addHitEffect(enemy.x, enemy.y, f.charData.color);
+            }
+          }
+        });
+      }
+
+      // Grant wind fury: +40% move speed, +25% damage for 2.5s
+      f.windFuryTimer = 2.5;
+
+      // Wind burst visual
+      EffectLib.addDashEffect(effectSystem, f.x, f.y, '#B0E0E6', 40);
+      effectSystem.addDamageNumber(f.x, f.y - f.charData.size, '疾风!', false, '#B0E0E6');
+      effectSystem.screenShake(4);
+
     } else if (f.dashSkillType === 'blazing_stampede') {
       // Seraph charge hit & trail logic
       const startX = f.dashStartX;
