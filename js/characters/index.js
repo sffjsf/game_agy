@@ -31,6 +31,10 @@ import { chain_fighter } from './ChainFighter.js';
 import { brawler } from './Brawler.js';
 import { rogue } from './Rogue.js';
 import { dawn_goddess } from './DawnGoddess.js';
+import { guard } from './Guard.js';
+import { crossbowman } from './Crossbowman.js';
+import { herbalist } from './Herbalist.js';
+import { scout } from './Scout.js';
 
 /**
  * Required fields every character data object must have.
@@ -132,6 +136,10 @@ export const characterData = {
   poisoner,
   spearman,
   frost_apprentice,
+  guard,
+  crossbowman,
+  herbalist,
+  scout,
   berserker,
   vulcan,
   summoned_golem,
