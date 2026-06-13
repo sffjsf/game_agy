@@ -95,6 +95,11 @@ export class Fighter {
     this.bloodShieldCooldown = 0;
     this.whistleCooldown = 0;
     this.rebirthUsed = false;
+    
+    // Mecha Pioneer mechanics
+    this.mechaShield = 0;
+    this.mechaShieldUsed = false;
+    this.sentryDroneTimer = 0;
 
     // Channeling skill state (e.g. Berserker whirlwind)
     this.channelTimer = 0;
@@ -186,7 +191,7 @@ export class Fighter {
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 
     this.updatePassiveTimers(dt);
-    this.updateAutomaticPassives(opposingTeam, effectSystem);
+    this.updateAutomaticPassives(opposingTeam, effectSystem, dt);
 
     // Clear clones when timer expires
     if (this.cloneTimer <= 0 && this.clones.length > 0) {
@@ -648,13 +653,17 @@ export class Fighter {
    * Automatic passives that can trigger without taking or dealing damage.
    * @param {Fighter[]} opposingTeam
    * @param {EffectSystem} effectSystem
+   * @param {number} dt
    */
-  updateAutomaticPassives(opposingTeam, effectSystem) {
+  updateAutomaticPassives(opposingTeam, effectSystem, dt) {
     if (this.hasPassive('steam_whistle')) {
       this.trySteamWhistle(opposingTeam, effectSystem);
     }
     if (this.hasPassive('heavenly_eye')) {
       Passives.tryHeavenlyEye(this, opposingTeam, effectSystem);
+    }
+    if (this.hasPassive('sentry_drones')) {
+      Passives.trySentryDrones(this, opposingTeam, effectSystem, dt);
     }
   }
 

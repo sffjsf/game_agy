@@ -17,6 +17,7 @@ export class CombatManager {
     this.weaponSystem = new WeaponSystem();
     this.effectSystem = new EffectSystem();
     this.poisonZones = [];
+    this.gravityWells = [];
 
     this.fighter1 = null;
     this.fighter2 = null;
@@ -99,6 +100,7 @@ export class CombatManager {
     this.weaponSystem.clear();
     this.effectSystem = new EffectSystem();
     this.poisonZones = [];
+    this.gravityWells = [];
 
     // State
     this.state = 'countdown';
@@ -133,6 +135,7 @@ export class CombatManager {
         battleCallbacks: {
           addPoisonZone: (...args) => this.addPoisonZone(...args),
           applyAreaDamage: (x, y, ownerTeam, damage, radius, attacker) => this.applyAreaDamage(x, y, ownerTeam, damage, radius, attacker),
+          addGravityWell: (...args) => this.addGravityWell(...args),
         },
       };
       const ctxLeft  = new BattleContext({ ...shared, opposingTeam: this.fightersRight, ownTeam: this.fightersLeft });
@@ -141,6 +144,7 @@ export class CombatManager {
       this.fightersRight.forEach(f => f.update(dt, ctxRight));
 
       this.updatePoisonZones(dt);
+      this.updateGravityWells(dt);
 
       // Resolve collision between all active fighters
       this.resolveFighterCollision();
@@ -428,6 +432,119 @@ export class CombatManager {
     ctx.globalAlpha = Math.min(1, progress * 3 + 0.2);
     ctx.fillText(text, 0, 0);
     ctx.restore();
+  }
+
+  addGravityWell(x, y, ownerTeam, radius, duration, damage) {
+    this.gravityWells.push({
+      x: safeFinite(x, 400),
+      y: safeFinite(y, 300),
+      ownerTeam: ownerTeam,
+      radius: radius || 130,
+      duration: duration || 2.5,
+      maxDuration: duration || 2.5,
+      damage: damage || 38
+    });
+  }
+
+  updateGravityWells(dt) {
+    for (let i = this.gravityWells.length - 1; i >= 0; i--) {
+      const well = this.gravityWells[i];
+      well.duration -= dt;
+
+      // Spawning swirling visual effects in gravity well
+      if (Math.random() < 0.4) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = well.radius * (0.3 + Math.random() * 0.7);
+        const px = well.x + Math.cos(angle) * dist;
+        const py = well.y + Math.sin(angle) * dist;
+        const speed = 140;
+        const vx = -Math.sin(angle) * speed - Math.cos(angle) * 90;
+        const vy = Math.cos(angle) * speed - Math.sin(angle) * 90;
+
+        this.effectSystem.addParticle({
+          x: px,
+          y: py,
+          vx: vx,
+          vy: vy,
+          life: 0.4 + Math.random() * 0.3,
+          maxLife: 0.7,
+          color: '#FF6D00',
+          size: 2.0 + Math.random() * 2,
+          gravity: 0,
+          friction: 0.96,
+          type: 'circle'
+        });
+      }
+
+      // Draw swirling central rings
+      if (Math.random() < 0.12) {
+        this.effectSystem.addParticle({
+          x: well.x,
+          y: well.y,
+          vx: 0,
+          vy: 0,
+          life: 0.25,
+          maxLife: 0.25,
+          color: '#3E2723',
+          size: 20 + Math.sin(Date.now() * 0.015) * 6,
+          gravity: 0,
+          friction: 1.0,
+          type: 'ring'
+        });
+      }
+
+      // If duration is finished, explode!
+      if (well.duration <= 0) {
+        // Deal area damage
+        this.applyAreaDamage(well.x, well.y, well.ownerTeam, well.damage, well.radius, null);
+        EffectLib.addFireBurstEffect(this.effectSystem, well.x, well.y, '#FF6D00', well.radius);
+        this.effectSystem.screenShake(10);
+        this.gravityWells.splice(i, 1);
+        continue;
+      }
+
+      // Apply pull and slow to enemies in range
+      const enemies = well.ownerTeam === 'left' ? this.fightersRight : this.fightersLeft;
+      if (enemies) {
+        enemies.forEach(enemy => {
+          if (!enemy.isAlive()) return;
+          const dx = enemy.x - well.x;
+          const dy = enemy.y - well.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+          if (dist <= well.radius) {
+            // Apply slow continuously
+            enemy.applySlow(0.2, 0.5);
+
+            // Pull towards center unless target has stone_shell
+            if (!enemy.hasPassive('stone_shell')) {
+              const pullPower = 150 * dt * (1 - dist / well.radius); // Pull stronger near center
+              const pullAngle = Math.atan2(dy, dx);
+              enemy.x -= Math.cos(pullAngle) * pullPower;
+              enemy.y -= Math.sin(pullAngle) * pullPower;
+            }
+
+            // Spawn particles pulling from enemy to center
+            if (Math.random() < 0.15) {
+              const pullAngle = Math.atan2(dy, dx);
+              this.effectSystem.addParticle({
+                x: enemy.x,
+                y: enemy.y,
+                vx: -Math.cos(pullAngle) * 250,
+                vy: -Math.sin(pullAngle) * 250,
+                life: 0.25,
+                maxLife: 0.25,
+                color: '#FF6D00',
+                size: 2,
+                gravity: 0,
+                friction: 0.95,
+                type: 'spark'
+              });
+            }
+          }
+        });
+      }
+    }
   }
 
   /* ── Getters ──────────────────────────────────────────── */

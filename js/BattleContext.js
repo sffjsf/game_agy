@@ -32,8 +32,9 @@ export class BattleContext {
     this.opposingTeam = opposingTeam || [];
     this.ownTeam = ownTeam || [];
 
-    // Cross-cutting callbacks (poison zones, area damage)
+    // Cross-cutting callbacks (poison zones, area damage, gravity wells)
     this.addPoisonZone = (battleCallbacks && battleCallbacks.addPoisonZone) || null;
     this.applyAreaDamage = (battleCallbacks && battleCallbacks.applyAreaDamage) || null;
+    this.addGravityWell = (battleCallbacks && battleCallbacks.addGravityWell) || null;
   }
 }

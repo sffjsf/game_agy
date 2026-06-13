@@ -169,7 +169,7 @@ export function tryHeavenlyEye(fighter, opposingTeam, effectSystem) {
   let damage = fighter.charData.attackPower * 2.5; // True damage multiplier
   
   // Create laser projectile that pieces all enemies
-  let proj = createProjectile(fighter.x, fighter.y, vx, vy, damage, fighter.id, '#FFF176', 40, 'laser', fighter);
+  let proj = createProjectile(fighter.x, fighter.y, vx, vy, damage, fighter.team, '#FFF176', 40, 'laser', fighter);
   fighter.battleContext.weaponSystem.projectiles.push(proj);
 
   EffectLib.addStunEffect(effectSystem, fighter.x, fighter.y, '#FFD700', 30);
@@ -195,6 +195,28 @@ export function applyDamageReductionPassives(fighter, damage, effectSystem) {
       effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '外壳减伤!', false, '#9E9E9E');
     }
   }
+  
+  if (fighter.hasPassive('electromagnetic_shield')) {
+    if (fighter.mechaShield > 0) {
+      if (damage >= fighter.mechaShield) {
+        damage -= fighter.mechaShield;
+        fighter.mechaShield = 0;
+        effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '护盾过载!', false, '#FF6D00');
+      } else {
+        fighter.mechaShield -= damage;
+        effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, `电磁偏转 ${Math.floor(damage)}`, false, '#FF9800');
+        damage = 0;
+      }
+    }
+    if (damage > 0 && fighter.hp - damage < fighter.maxHp * 0.35 && !fighter.mechaShieldUsed) {
+      fighter.mechaShieldUsed = true;
+      fighter.mechaShield = fighter.maxHp * 0.30;
+      effectSystem.addHealEffect(fighter.x, fighter.y);
+      effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '+磁能护盾!', false, '#FF6D00');
+      EffectLib.addCloneEffect(effectSystem, fighter.x, fighter.y, '#FF6D00', 40);
+    }
+  }
+
   if (!fighter.hasPassive('blood_shield')) return damage;
   if (fighter.bloodShield > 0) {
     if (damage >= fighter.bloodShield) {
@@ -254,4 +276,69 @@ export function tryLethalSurvivalPassives(fighter, effectSystem) {
   }
 
   return false;
+}
+
+export function trySentryDrones(fighter, opposingTeam, effectSystem, dt) {
+  if (!opposingTeam || fighter.isStunned()) return;
+
+  if (fighter.sentryDroneTimer === undefined) {
+    fighter.sentryDroneTimer = 0;
+  }
+
+  fighter.sentryDroneTimer -= dt;
+  if (fighter.sentryDroneTimer <= 0) {
+    fighter.sentryDroneTimer = 0.8; // Shoot every 0.8 seconds
+
+    // Find closest enemy
+    let closestEnemy = null;
+    let minDist = Infinity;
+    opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      const dx = enemy.x - fighter.x;
+      const dy = enemy.y - fighter.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDist) {
+        minDist = dist;
+        closestEnemy = enemy;
+      }
+    });
+
+    if (closestEnemy) {
+      const leftAngle = fighter.angle + Math.PI / 2;
+      const rightAngle = fighter.angle - Math.PI / 2;
+
+      const size = fighter.charData.size;
+      const leftX = fighter.x + Math.cos(leftAngle) * size * 0.9;
+      const leftY = fighter.y + Math.sin(leftAngle) * size * 0.9;
+      const rightX = fighter.x + Math.cos(rightAngle) * size * 0.9;
+      const rightY = fighter.y + Math.sin(rightAngle) * size * 0.9;
+
+      const speed = 800;
+
+      // Left drone shoot
+      const dxL = closestEnemy.x - leftX;
+      const dyL = closestEnemy.y - leftY;
+      const distL = Math.sqrt(dxL * dxL + dyL * dyL) || 1;
+      const vxL = (dxL / distL) * speed;
+      const vyL = (dyL / distL) * speed;
+
+      // Right drone shoot
+      const dxR = closestEnemy.x - rightX;
+      const dyR = closestEnemy.y - rightY;
+      const distR = Math.sqrt(dxR * dxR + dyR * dyR) || 1;
+      const vxR = (dxR / distR) * speed;
+      const vyR = (dyR / distR) * speed;
+
+      const projL = createProjectile(leftX, leftY, vxL, vyL, 5, fighter.team, '#FF6D00', 12, 'laser', fighter);
+      const projR = createProjectile(rightX, rightY, vxR, vyR, 5, fighter.team, '#FF6D00', 12, 'laser', fighter);
+
+      fighter.battleContext.weaponSystem.projectiles.push(projL);
+      fighter.battleContext.weaponSystem.projectiles.push(projR);
+
+      EffectLib.addMultiShotEffect(effectSystem, leftX, leftY, '#FF6D00', 10);
+      EffectLib.addMultiShotEffect(effectSystem, rightX, rightY, '#FF6D00', 10);
+
+      if (soundSystem) soundSystem.playShootSound();
+    }
+  }
 }

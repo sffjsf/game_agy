@@ -31,25 +31,25 @@ export class LaserProjectile extends BaseProjectile {
     var alpha = Math.max(0, 1 - (this.life / this.maxLife));
     ctx.globalAlpha = alpha;
 
-    // The laser is a long glowing line
+    // The laser is a long glowing line (shifted forward to prevent clipping backward into caster)
     ctx.beginPath();
-    ctx.moveTo(-40, 0);
-    ctx.lineTo(40, 0);
+    ctx.moveTo(-10, 0);
+    ctx.lineTo(70, 0);
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(-60, 0);
-    ctx.lineTo(60, 0);
+    ctx.moveTo(-10, 0);
+    ctx.lineTo(110, 0);
     ctx.strokeStyle = this.color;
     ctx.lineWidth = 14;
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(-80, 0);
-    ctx.lineTo(80, 0);
+    ctx.moveTo(-10, 0);
+    ctx.lineTo(150, 0);
     ctx.strokeStyle = this.color + '66';
     ctx.lineWidth = 24;
     ctx.stroke();
