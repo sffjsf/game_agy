@@ -35,7 +35,7 @@
         <div class="character-grid" id="right-grid"></div>
       </div>
     </div>
-    <div class="settings-container" style="display: flex; gap: 15px; align-items: center; justify-content: center; margin-top: 10px; margin-bottom: 15px;">
+    <div class="settings-container" style="display: flex; gap: 15px; align-items: center; justify-content: center; margin-top: 5px; margin-bottom: 5px;">
       <label for="arena-size-select" style="font-family: var(--font-cn); font-weight: 700; color: var(--text-dim); font-size: 0.95rem;">地图尺寸 (Battlefield Size):</label>
       <select id="arena-size-select" class="select-global">
         <option value="auto">🌟 智能自适应 (Auto-responsive)</option>
@@ -51,7 +51,7 @@
         <input type="number" id="custom-height" placeholder="高 (Height)" min="300" max="2160" value="600" class="input-global" style="width: 100px;">
       </div>
     </div>
-    <div style="display: flex; gap: 20px; justify-content: center; margin-top: 20px;">
+    <div style="display: flex; gap: 20px; justify-content: center; margin-top: 10px;">
       <button id="start-btn" class="btn-primary" disabled>选择角色开始战斗</button>
       <button id="open-codex-btn" class="btn-secondary">📖 英雄图鉴</button>
     </div>
@@ -122,6 +122,10 @@
     <div class="codex-container">
       <div class="codex-header">
         <h1>英雄图鉴 (Hero Codex)</h1>
+        <div class="codex-tabs">
+          <button id="codex-tab-regular" class="codex-tab-btn active">普通战士 (Regulars)</button>
+          <button id="codex-tab-hero" class="codex-tab-btn">⭐ 英雄角色 (Heroes)</button>
+        </div>
         <button id="close-codex-btn" class="btn-secondary">返回主页 (Back)</button>
       </div>
       <div id="codex-grid" class="codex-grid"></div>

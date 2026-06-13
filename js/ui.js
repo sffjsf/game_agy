@@ -146,7 +146,7 @@ export class UIManager {
 
   _createCard(charId, char, side) {
     const card = document.createElement('div');
-    card.className = 'character-card';
+    card.className = char.isHero ? 'character-card is-hero' : 'character-card';
     card.dataset.charId = charId;
     card.dataset.side = side;
 
@@ -467,12 +467,39 @@ export class UIManager {
 
     const openCodexBtn = document.getElementById('open-codex-btn');
     const closeCodexBtn = document.getElementById('close-codex-btn');
+    
+    const tabRegular = document.getElementById('codex-tab-regular');
+    const tabHero = document.getElementById('codex-tab-hero');
+    this.currentCodexFilter = 'regular'; // Default filter
+
+    if (tabRegular) {
+      tabRegular.addEventListener('click', () => {
+        if (soundSystem) soundSystem.playClickSound();
+        this.currentCodexFilter = 'regular';
+        tabRegular.classList.add('active');
+        if (tabHero) tabHero.classList.remove('active');
+        this._populateCodex();
+      });
+    }
+    if (tabHero) {
+      tabHero.addEventListener('click', () => {
+        if (soundSystem) soundSystem.playClickSound();
+        this.currentCodexFilter = 'hero';
+        tabHero.classList.add('active');
+        if (tabRegular) tabRegular.classList.remove('active');
+        this._populateCodex();
+      });
+    }
+
     if (openCodexBtn) {
       openCodexBtn.addEventListener('click', () => {
         if (soundSystem) {
           soundSystem.init();
           soundSystem.playClickSound();
         }
+        this.currentCodexFilter = 'regular';
+        if (tabRegular) tabRegular.classList.add('active');
+        if (tabHero) tabHero.classList.remove('active');
         this._populateCodex();
         this.showScreen('codex');
       });
@@ -572,9 +599,16 @@ export class UIManager {
     if (!codexGrid) return;
     codexGrid.innerHTML = '';
 
+    const filter = this.currentCodexFilter || 'regular';
+
     const charIds = Object.keys(characterData);
     charIds.forEach(id => {
       const char = characterData[id];
+
+      // Filter by regular vs hero tab
+      if (filter === 'hero' && !char.isHero) return;
+      if (filter === 'regular' && char.isHero) return;
+
       // Only show visible characters in codex (unless we want to show hidden minions too? Let's show all to be fully detailed)
       const isHidden = char.hidden ? '<span style="color: #ff5252; font-size: 0.8em; margin-left: 8px;">(隐藏角色)</span>' : '';
 
@@ -607,7 +641,7 @@ export class UIManager {
       `;
       
       const isHero = char.isHero;
-      const badgeHtml = isHero ? '<div class="hero-badge" style="top: 8px; left: 8px; font-size: 12px; padding: 4px 8px;">⭐ 英雄</div>' : '';
+      const badgeHtml = isHero ? '<div class="hero-badge">⭐ 英雄</div>' : '';
 
       card.innerHTML = `
         ${badgeHtml}
