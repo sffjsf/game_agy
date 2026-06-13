@@ -33,10 +33,12 @@ export function executeHavocInHeaven(caster, skill, weaponSystem, effectSystem) 
       enemy.applyStun(1.5);
       
       // Knockback slightly
-      const kbAngle = Math.atan2(dy, dx);
-      if (isFinite(kbAngle)) {
-        enemy.x += Math.cos(kbAngle) * 30;
-        enemy.y += Math.sin(kbAngle) * 30;
+      if (!enemy.hasPassive('stone_shell')) {
+        const kbAngle = Math.atan2(dy, dx);
+        if (isFinite(kbAngle)) {
+          enemy.x += Math.cos(kbAngle) * 30;
+          enemy.y += Math.sin(kbAngle) * 30;
+        }
       }
       
       effectSystem.addHitEffect(enemy.x, enemy.y, '#FF9800');

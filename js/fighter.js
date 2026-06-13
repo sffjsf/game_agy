@@ -707,10 +707,12 @@ export class Fighter {
     if (soundSystem) soundSystem.playHitSound();
 
     // Knockback (5-8px away from attacker)
-    const kb = safeDirection(this.x - attackerX, this.y - attackerY);
-    var kbDist = 5 + Math.random() * 3;
-    this.x += kb.dx * kbDist;
-    this.y += kb.dy * kbDist;
+    if (!this.hasPassive('stone_shell')) {
+      const kb = safeDirection(this.x - attackerX, this.y - attackerY);
+      var kbDist = 5 + Math.random() * 3;
+      this.x += kb.dx * kbDist;
+      this.y += kb.dy * kbDist;
+    }
 
     // State transition
     if (this.hp <= 0) {

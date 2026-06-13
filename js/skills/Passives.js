@@ -120,13 +120,16 @@ export function trySteamWhistle(fighter, opposingTeam, effectSystem) {
     triggered = true;
     var kbAngle = Math.atan2(enemy.y - fighter.y, enemy.x - fighter.x);
     if (isNaN(kbAngle) || !isFinite(kbAngle)) kbAngle = 0;
-    var nextX = enemy.x + Math.cos(kbAngle) * 80;
-    var nextY = enemy.y + Math.sin(kbAngle) * 80;
-    if (isFinite(nextX)) enemy.x = nextX;
-    if (isFinite(nextY)) enemy.y = nextY;
+    if (!enemy.hasPassive('stone_shell')) {
+      var nextX = enemy.x + Math.cos(kbAngle) * 80;
+      var nextY = enemy.y + Math.sin(kbAngle) * 80;
+      if (isFinite(nextX)) enemy.x = nextX;
+      if (isFinite(nextY)) enemy.y = nextY;
+    }
     enemy.applySlow(2.0);
     effectSystem.addHitEffect(enemy.x, enemy.y, '#FFD700');
-    effectSystem.addDamageNumber(enemy.x, enemy.y - enemy.charData.size, '击退 & 减慢!', false, '#FFD700');
+    const msg = enemy.hasPassive('stone_shell') ? '减慢!' : '击退 & 减慢!';
+    effectSystem.addDamageNumber(enemy.x, enemy.y - enemy.charData.size, msg, false, '#FFD700');
   });
   if (!triggered) return;
   fighter.whistleCooldown = 6.0;
@@ -184,6 +187,14 @@ export function tryDamageAvoidancePassives(fighter, effectSystem) {
 }
 
 export function applyDamageReductionPassives(fighter, damage, effectSystem) {
+  if (fighter.hasPassive('stone_shell')) {
+    damage *= 0.9; // 10% damage reduction
+    const maxDamageCap = fighter.maxHp * 0.15;
+    if (damage > maxDamageCap) {
+      damage = maxDamageCap;
+      effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '外壳减伤!', false, '#9E9E9E');
+    }
+  }
   if (!fighter.hasPassive('blood_shield')) return damage;
   if (fighter.bloodShield > 0) {
     if (damage >= fighter.bloodShield) {
