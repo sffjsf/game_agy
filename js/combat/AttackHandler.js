@@ -55,12 +55,69 @@ export class AttackHandler {
           }
         }
 
+        // Combo strikes: repeated hits on the same target ramp damage
+        if (f.hasPassive('combo_strikes')) {
+          if (f.comboTarget === f.target) {
+            f.comboStacks = Math.min((f.comboStacks || 0) + 1, 5);
+          } else {
+            f.comboTarget = f.target;
+            f.comboStacks = 1;
+          }
+          finalDamage *= (1 + f.comboStacks * 0.08);
+          if (f.comboStacks >= 3) {
+            effectSystem.addDamageNumber(f.x, f.y - f.charData.size, `连打 x${f.comboStacks}`, false, '#FFCCBC');
+          }
+        }
+
+        // Rogue backstab: bonus damage when attacking from behind the target.
+        // Smoke step also guarantees the next attack window can backstab, because
+        // enemies constantly turn toward their target outside stun windows.
+        if (f.hasPassive('rogue_backstab')) {
+          let isBackstab = f.smokeDodgeTimer > 0;
+          if (!isBackstab) {
+            const fromTargetAngle = Math.atan2(f.y - f.target.y, f.x - f.target.x);
+            let backAngleDiff = fromTargetAngle - (f.target.angle + Math.PI);
+            while (backAngleDiff > Math.PI) backAngleDiff -= Math.PI * 2;
+            while (backAngleDiff < -Math.PI) backAngleDiff += Math.PI * 2;
+            isBackstab = Math.abs(backAngleDiff) <= Math.PI * 0.45;
+          }
+          if (isBackstab) {
+            finalDamage *= 1.45;
+            effectSystem.addDamageNumber(f.target.x, f.target.y - f.target.charData.size - 12, '背刺!', false, '#B39DDB');
+          }
+        }
+
         // Apply outgoing damage multiplier (e.g. wind fury)
         finalDamage *= f.getOutgoingDamageMultiplier();
 
         f.applyMeleeHitPassives(finalDamage, f.target, effectSystem);
         f.target.takeDamage(finalDamage, f.x, f.y, effectSystem);
         f.healFromDamage(finalDamage, effectSystem);
+
+        // Counter stance: consume the empowered strike after landing it
+        if (f.counterStanceTimer > 0) {
+          f.counterStanceTimer = 0;
+        }
+
+        // Counter stance: melee hits prime the target's next counterattack
+        if (f.target.isAlive() && f.target.hasPassive('counter_stance')) {
+          f.target.counterStanceTimer = 3.0;
+          effectSystem.addDamageNumber(f.target.x, f.target.y - f.target.charData.size, '反击!', false, '#D7CCC8');
+        }
+
+        // Chain tether: basic attacks can pull the enemy closer
+        if (f.target.isAlive() && f.hasPassive('chain_tether') && Math.random() < 0.35) {
+          const pullDx = f.x - f.target.x;
+          const pullDy = f.y - f.target.y;
+          const pullDist = Math.sqrt(pullDx * pullDx + pullDy * pullDy) || 1;
+          if (!f.target.hasPassive('stone_shell')) {
+            f.target.x += (pullDx / pullDist) * 45;
+            f.target.y += (pullDy / pullDist) * 45;
+          }
+          f.target.applySlow(1.0, 0.6);
+          effectSystem.addHitEffect(f.target.x, f.target.y, '#BDBDBD');
+          effectSystem.addDamageNumber(f.target.x, f.target.y - f.target.charData.size, '牵制!', false, '#BDBDBD');
+        }
 
         // Shield wall: melee attackers can be knocked back by the target's shield
         if (f.target.isAlive() && f.target.hasPassive('shield_wall') && Math.random() < 0.3) {

@@ -107,6 +107,16 @@ export class Fighter {
     // Wind Dancer mechanics
     this.windFuryTimer = 0;
 
+    // Ronin mechanics
+    this.counterStanceTimer = 0;
+
+    // Brawler mechanics
+    this.comboTarget = null;
+    this.comboStacks = 0;
+
+    // Rogue mechanics
+    this.smokeDodgeTimer = 0;
+
     // Channeling skill state (e.g. Berserker whirlwind)
     this.channelTimer = 0;
     this.channelTick = 0;
@@ -195,6 +205,8 @@ export class Fighter {
     }
     this.heavenlyEyeCooldown = Math.max(0, (this.heavenlyEyeCooldown || 0) - dt);
     this.windFuryTimer = Math.max(0, (this.windFuryTimer || 0) - dt);
+    this.counterStanceTimer = Math.max(0, (this.counterStanceTimer || 0) - dt);
+    this.smokeDodgeTimer = Math.max(0, (this.smokeDodgeTimer || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 
     this.updatePassiveTimers(dt);
@@ -802,6 +814,10 @@ export class Fighter {
     if (this.hasPassive('bounty_mark') && this.bountyHunterStacks > 0) {
       rate *= (1 + this.bountyHunterStacks * 0.04);
     }
+    // Counter stance: retaliate faster after being hit by melee
+    if (this.counterStanceTimer > 0) {
+      rate *= 1.6;
+    }
     return rate;
   }
 
@@ -831,6 +847,10 @@ export class Fighter {
     // Wind fury: +25% damage
     if (this.windFuryTimer > 0) {
       mult *= 1.25;
+    }
+    // Counter stance: next melee counter hit deals +35% damage
+    if (this.counterStanceTimer > 0) {
+      mult *= 1.35;
     }
     return mult;
   }

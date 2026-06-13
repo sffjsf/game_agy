@@ -191,6 +191,12 @@ export function tryDamageAvoidancePassives(fighter, effectSystem) {
     return true;
   }
 
+  if (fighter.hasPassive('smoke_step') && fighter.smokeDodgeTimer > 0 && Math.random() < 0.45) {
+    effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '烟步!', false, '#B39DDB');
+    effectSystem.addHitEffect(fighter.x, fighter.y, '#B39DDB');
+    return true;
+  }
+
   return false;
 }
 

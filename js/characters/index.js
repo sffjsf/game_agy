@@ -26,6 +26,10 @@ import { seraph } from './Seraph.js';
 import { bounty_hunter } from './BountyHunter.js';
 import { wind_dancer } from './WindDancer.js';
 import { shield_lancer } from './ShieldLancer.js';
+import { ronin } from './Ronin.js';
+import { chain_fighter } from './ChainFighter.js';
+import { brawler } from './Brawler.js';
+import { rogue } from './Rogue.js';
 
 /**
  * Required fields every character data object must have.
@@ -138,7 +142,11 @@ export const characterData = {
   seraph,
   bounty_hunter,
   wind_dancer,
-  shield_lancer
+  shield_lancer,
+  ronin,
+  chain_fighter,
+  brawler,
+  rogue
 };
 
 // ── Validate all characters on import (dev-only safety net) ──

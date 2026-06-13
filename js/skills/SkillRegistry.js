@@ -22,6 +22,8 @@ import { executeGroundSlam } from './abilities/GroundSlam.js';
 import { executeGravityWell } from './abilities/GravityWell.js';
 import { executeBlazingStampede } from './abilities/BlazingStampede.js';
 import { executeGaleDash } from './abilities/GaleDash.js';
+import { executeChainPull } from './abilities/ChainPull.js';
+import { executeSmokeBomb } from './abilities/SmokeBomb.js';
 import { safeFinite } from '../utils.js';
 
 /**
@@ -56,6 +58,8 @@ const skillExecutors = {
   gravity_well:       executeGravityWell,
   blazing_stampede:   executeBlazingStampede,
   gale_dash:          executeGaleDash,
+  chain_pull:         executeChainPull,
+  smoke_bomb:         executeSmokeBomb,
 };
 
 /**
