@@ -1,6 +1,7 @@
 import * as EffectLib from '../effects_lib/index.js';
 import { executeSkillStrategy } from '../skills/SkillRegistry.js';
 import { soundSystem } from '../audio.js';
+import { getArenaBoundaryIntersection } from '../skills/abilities/BlazingStampede.js';
 
 /**
  * AttackHandler - Executes attacks, skills, and dashing-skill payloads for a Fighter.
@@ -111,6 +112,8 @@ export class AttackHandler {
       dist = 1;
     }
 
+    let nextDashStarted = false;
+
     if (f.dashSkillType === 'dash') {
       // Vampire dash damage & heal
       if (dist <= 45) {
@@ -145,15 +148,108 @@ export class AttackHandler {
           }
         });
       }
+    } else if (f.dashSkillType === 'blazing_stampede') {
+      // Seraph charge hit & trail logic
+      const startX = f.dashStartX;
+      const startY = f.dashStartY;
+      const endX = f.dashTargetX;
+      const endY = f.dashTargetY;
+
+      const pathDx = endX - startX;
+      const pathDy = endY - startY;
+      const pathLen = Math.sqrt(pathDx * pathDx + pathDy * pathDy) || 1;
+
+      // 1. Damage all enemies along the path (distance threshold 50px)
+      const opposingTeam = ctx.opposingTeam;
+      if (opposingTeam) {
+        opposingTeam.forEach(enemy => {
+          if (enemy.isAlive()) {
+            const ex = enemy.x;
+            const ey = enemy.y;
+
+            let t = ((ex - startX) * pathDx + (ey - startY) * pathDy) / (pathLen * pathLen);
+            t = Math.max(0, Math.min(1, t));
+            const closestX = startX + t * pathDx;
+            const closestY = startY + t * pathDy;
+            const distToPath = Math.sqrt((ex - closestX) * (ex - closestX) + (ey - closestY) * (ey - closestY));
+
+            if (distToPath <= 50) {
+              enemy.takeDamage(skill.damage, f.x, f.y, effectSystem);
+              enemy.applyBurn(2.0, 8.0);
+              EffectLib.addFireBurstEffect(effectSystem, enemy.x, enemy.y, '#FF3D00', 30);
+            }
+          }
+        });
+      }
+
+      // 2. Spawn a trail of burning zones along the path (radius 45, duration 2.0s, DPS 8.0)
+      if (ctx.addBurnZone) {
+        const stepSize = 40;
+        const numSteps = Math.floor(pathLen / stepSize);
+        for (let i = 0; i <= numSteps; i++) {
+          const pct = numSteps > 0 ? i / numSteps : 0;
+          const px = startX + pathDx * pct;
+          const py = startY + pathDy * pct;
+          ctx.addBurnZone(px, py, f.team, 45, 2.0, 8.0);
+        }
+      }
+
+      effectSystem.screenShake(6);
+
+      // 3. Handle consecutive charges
+      f.seraphChargeCount--;
+      if (f.seraphChargeCount > 0) {
+        if (!f.target || !f.target.isAlive()) {
+          f.ai.findClosestTarget(ctx.opposingTeam);
+        }
+
+        if (f.target && f.target.isAlive()) {
+          const nextDx = f.target.x - f.x;
+          const nextDy = f.target.y - f.y;
+          const nextDist = Math.sqrt(nextDx * nextDx + nextDy * nextDy) || 1;
+          let dirX = nextDx / nextDist;
+          let dirY = nextDy / nextDist;
+
+          if (nextDist < 15 || isNaN(dirX) || isNaN(dirY) || (dirX === 0 && dirY === 0)) {
+            const cx = ctx.arenaX + ctx.arenaWidth / 2;
+            const cy = ctx.arenaY + ctx.arenaHeight / 2;
+            const toCenterX = cx - f.x;
+            const toCenterY = cy - f.y;
+            const toCenterDist = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY) || 1;
+            dirX = toCenterX / toCenterDist;
+            dirY = toCenterY / toCenterDist;
+          }
+
+          const intersection = getArenaBoundaryIntersection(
+            f.x, f.y, dirX, dirY,
+            ctx.arenaX, ctx.arenaY, ctx.arenaWidth, ctx.arenaHeight
+          );
+
+          f.setState('dashing_skill');
+          f.dashStartX = f.x;
+          f.dashStartY = f.y;
+          f.dashTargetX = intersection.x;
+          f.dashTargetY = intersection.y;
+          f.dashDuration = 0.22;
+          f.dashTimer = 0;
+          f.dashSkillType = 'blazing_stampede';
+
+          EffectLib.addDashEffect(effectSystem, f.x, f.y, f.charData.color, 25);
+          if (soundSystem) soundSystem.playShootSound();
+          nextDashStarted = true;
+        }
+      }
     }
 
-    // Go to cooldown or reposition
-    if (Math.random() < 0.4) {
-      f.ai.startReposition(ctx);
-    } else {
-      f.setState('cooldown');
-      f.repositionType = (f.charData.weaponType === 'ranged') ? 'retreat' : (Math.random() < 0.65 ? 'circle' : 'retreat');
-      f.circleDir = Math.random() < 0.5 ? 1 : -1;
+    // Go to cooldown or reposition (only if we did not transition to next dash)
+    if (!nextDashStarted) {
+      if (Math.random() < 0.4) {
+        f.ai.startReposition(ctx);
+      } else {
+        f.setState('cooldown');
+        f.repositionType = (f.charData.weaponType === 'ranged') ? 'retreat' : (Math.random() < 0.65 ? 'circle' : 'retreat');
+        f.circleDir = Math.random() < 0.5 ? 1 : -1;
+      }
     }
   }
 }

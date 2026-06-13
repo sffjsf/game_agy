@@ -397,7 +397,7 @@ export class Fighter {
       // DASHING_SKILL: Slide smoothly towards the target location
       // ───────────────────────────────────────────────
       case 'dashing_skill':
-        if (!this.target || !this.target.isAlive()) {
+        if (this.dashSkillType !== 'blazing_stampede' && (!this.target || !this.target.isAlive())) {
           this.setState('chase');
           break;
         }
@@ -712,8 +712,27 @@ export class Fighter {
     const damageColor = this.team === 'left' ? '#FF5252' : '#29B6F6';
     effectSystem.addDamageNumber(this.x, this.y - this.charData.size, damage, false, damageColor);
 
-    // Play hit sound
+     // Play hit sound
     if (soundSystem) soundSystem.playHitSound();
+
+    // Blazing wings passive: burn the closest enemy to the attack position
+    if (this.hasPassive('blazing_wings') && this.battleContext && this.battleContext.opposingTeam) {
+      let closestAttacker = null;
+      let minDistance = Infinity;
+      this.battleContext.opposingTeam.forEach(enemy => {
+        if (!enemy.isAlive()) return;
+        const dx = enemy.x - attackerX;
+        const dy = enemy.y - attackerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestAttacker = enemy;
+        }
+      });
+      if (closestAttacker) {
+        closestAttacker.applyBurn(2.0, 6.0);
+      }
+    }
 
     // Knockback (5-8px away from attacker)
     if (!this.hasPassive('stone_shell')) {

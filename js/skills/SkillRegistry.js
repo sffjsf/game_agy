@@ -20,6 +20,7 @@ import { executeHavocInHeaven } from './abilities/HavocInHeaven.js';
 import { executeWhirlwind, executeWhirlwindTick, executeWhirlwindDamage } from './abilities/Whirlwind.js';
 import { executeGroundSlam } from './abilities/GroundSlam.js';
 import { executeGravityWell } from './abilities/GravityWell.js';
+import { executeBlazingStampede } from './abilities/BlazingStampede.js';
 import { safeFinite } from '../utils.js';
 
 /**
@@ -52,6 +53,7 @@ const skillExecutors = {
   whirlwind:          executeWhirlwind,
   ground_slam:        executeGroundSlam,
   gravity_well:       executeGravityWell,
+  blazing_stampede:   executeBlazingStampede,
 };
 
 /**

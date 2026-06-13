@@ -18,6 +18,7 @@ export class CombatManager {
     this.effectSystem = new EffectSystem();
     this.poisonZones = [];
     this.gravityWells = [];
+    this.burnZones = [];
 
     this.fighter1 = null;
     this.fighter2 = null;
@@ -101,6 +102,7 @@ export class CombatManager {
     this.effectSystem = new EffectSystem();
     this.poisonZones = [];
     this.gravityWells = [];
+    this.burnZones = [];
 
     // State
     this.state = 'countdown';
@@ -136,6 +138,7 @@ export class CombatManager {
           addPoisonZone: (...args) => this.addPoisonZone(...args),
           applyAreaDamage: (x, y, ownerTeam, damage, radius, attacker) => this.applyAreaDamage(x, y, ownerTeam, damage, radius, attacker),
           addGravityWell: (...args) => this.addGravityWell(...args),
+          addBurnZone: (...args) => this.addBurnZone(...args),
         },
       };
       const ctxLeft  = new BattleContext({ ...shared, opposingTeam: this.fightersRight, ownTeam: this.fightersLeft });
@@ -145,6 +148,7 @@ export class CombatManager {
 
       this.updatePoisonZones(dt);
       this.updateGravityWells(dt);
+      this.updateBurnZones(dt);
 
       // Resolve collision between all active fighters
       this.resolveFighterCollision();
@@ -361,6 +365,64 @@ export class CombatManager {
     // ── Draw arena background ──
     this._drawArena(ctx);
 
+    // ── Draw ground zones (burn, poison) ──
+    if (this.state === 'countdown' || this.state === 'fighting' || this.state === 'finished') {
+      const time = performance.now() / 1000;
+
+      // Draw poison zones
+      if (this.poisonZones && this.poisonZones.length > 0) {
+        this.poisonZones.forEach(zone => {
+          ctx.save();
+          const grad = ctx.createRadialGradient(zone.x, zone.y, 2, zone.x, zone.y, zone.radius);
+          grad.addColorStop(0, 'rgba(76, 175, 80, 0.25)'); // Green center
+          grad.addColorStop(0.6, 'rgba(156, 39, 176, 0.12)'); // Purple middle
+          grad.addColorStop(1, 'rgba(156, 39, 176, 0)'); // Fade out
+          
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Poison ring outline
+          ctx.strokeStyle = 'rgba(76, 175, 80, 0.15)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(zone.x, zone.y, zone.radius * (0.95 + Math.sin(time * 3 + zone.x) * 0.03), 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+
+      // Draw burn zones
+      if (this.burnZones && this.burnZones.length > 0) {
+        this.burnZones.forEach(zone => {
+          ctx.save();
+          // Pulsing radius for fire effect
+          const pulseRadius = zone.radius * (0.95 + Math.sin(time * 8 + zone.x * zone.y) * 0.05);
+          
+          const grad = ctx.createRadialGradient(zone.x, zone.y, 2, zone.x, zone.y, pulseRadius);
+          grad.addColorStop(0, 'rgba(255, 110, 0, 0.35)'); // Bright orange center
+          grad.addColorStop(0.5, 'rgba(255, 61, 0, 0.18)'); // Reddish inner ring
+          grad.addColorStop(0.8, 'rgba(230, 81, 0, 0.08)'); // Dark orange/red
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Transparent edge
+          
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(zone.x, zone.y, pulseRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Cracking outline
+          ctx.strokeStyle = 'rgba(255, 61, 0, 0.2)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 6]);
+          ctx.beginPath();
+          ctx.arc(zone.x, zone.y, pulseRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+    }
+
     // ── Battle / Finished rendering ──
     if (this.state === 'countdown' || this.state === 'fighting' || this.state === 'finished') {
       const time = performance.now() / 1000;
@@ -544,6 +606,66 @@ export class CombatManager {
           }
         });
       }
+    }
+  }
+
+  addBurnZone(x, y, ownerTeam, radius, duration, burnDps) {
+    this.burnZones.push({
+      x: safeFinite(x, 400),
+      y: safeFinite(y, 300),
+      ownerTeam: ownerTeam,
+      radius: radius || 40,
+      duration: duration || 2.0,
+      maxDuration: duration || 2.0,
+      burnDps: burnDps || 8.0
+    });
+  }
+
+  updateBurnZones(dt) {
+    for (let i = this.burnZones.length - 1; i >= 0; i--) {
+      const zone = this.burnZones[i];
+      zone.duration -= dt;
+      if (zone.duration <= 0) {
+        this.burnZones.splice(i, 1);
+        continue;
+      }
+
+      // Spawn flame particles inside the burn zone
+      if (Math.random() < 0.25) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * zone.radius;
+        const px = zone.x + Math.cos(angle) * dist;
+        const py = zone.y + Math.sin(angle) * dist;
+
+        this.effectSystem.addParticle({
+          x: px,
+          y: py,
+          vx: (Math.random() - 0.5) * 20,
+          vy: -20 - Math.random() * 30, // Float up
+          life: 0.3 + Math.random() * 0.25,
+          maxLife: 0.55,
+          color: Math.random() < 0.6 ? '#FF3D00' : '#FFC400',
+          size: 2.0 + Math.random() * 2.5,
+          gravity: -60, // Light gravity upwards
+          friction: 0.94,
+          type: 'spark'
+        });
+      }
+
+      const enemies = zone.ownerTeam === 'left' ? this.fightersRight : this.fightersLeft;
+      if (!enemies) continue;
+
+      enemies.forEach(enemy => {
+        if (!enemy.isAlive()) return;
+        const dx = enemy.x - zone.x;
+        const dy = enemy.y - zone.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+        if (dist <= zone.radius) {
+          // Apply burn debuff (lasts 1.0 second, refreshed continuously)
+          enemy.applyBurn(1.0, zone.burnDps);
+        }
+      });
     }
   }
 

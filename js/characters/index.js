@@ -22,6 +22,7 @@ import { xiaotian_hound } from './XiaotianHound.js';
 import { monkey_king } from './MonkeyKing.js';
 import { stone_golem } from './StoneGolem.js';
 import { mecha_pioneer } from './MechaPioneer.js';
+import { seraph } from './Seraph.js';
 
 /**
  * Required fields every character data object must have.
@@ -130,7 +131,8 @@ export const characterData = {
   xiaotian_hound,
   monkey_king,
   stone_golem,
-  mecha_pioneer
+  mecha_pioneer,
+  seraph
 };
 
 // ── Validate all characters on import (dev-only safety net) ──
