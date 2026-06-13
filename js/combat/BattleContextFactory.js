@@ -10,6 +10,7 @@ export function createBattleContexts(combatManager) {
     arenaY: combatManager.arenaY,
     temporalFields: combatManager.temporalFields,
     swordArrays: combatManager.swordArrays,
+    frostLands: combatManager.frostLands,
     battleCallbacks: {
       addPoisonZone: (...args) => combatManager.addPoisonZone(...args),
       applyAreaDamage: (x, y, ownerTeam, damage, radius, attacker) => combatManager.applyAreaDamage(x, y, ownerTeam, damage, radius, attacker),
@@ -17,6 +18,7 @@ export function createBattleContexts(combatManager) {
       addBurnZone: (...args) => combatManager.addBurnZone(...args),
       addTemporalField: (...args) => combatManager.addTemporalField(...args),
       addSwordArray: (...args) => combatManager.addSwordArray(...args),
+      addFrostLand: (...args) => combatManager.addFrostLand(...args),
     },
   };
 

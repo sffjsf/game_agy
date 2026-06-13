@@ -9,6 +9,7 @@ export class HazardZoneManager {
     this.burnZones = [];
     this.temporalFields = [];
     this.swordArrays = [];
+    this.frostLands = [];
   }
 
   clear() {
@@ -17,6 +18,7 @@ export class HazardZoneManager {
     this.burnZones = [];
     this.temporalFields = [];
     this.swordArrays = [];
+    this.frostLands = [];
   }
 
   addPoisonZone(x, y, ownerTeam, radius, duration, poisonDps, slowDuration) {
@@ -79,12 +81,27 @@ export class HazardZoneManager {
     });
   }
 
+  addFrostLand(x, y, ownerTeam, radius, duration, damage, caster) {
+    this.frostLands.push({
+      x: safeFinite(x, 400),
+      y: safeFinite(y, 300),
+      ownerTeam,
+      radius: radius || 190,
+      duration: duration || 3.0,
+      maxDuration: duration || 3.0,
+      damage: damage || 8,
+      tickTimer: 0,
+      caster
+    });
+  }
+
   update(dt, battle) {
     this.updatePoisonZones(dt, battle);
     this.updateGravityWells(dt, battle);
     this.updateBurnZones(dt, battle);
     this.updateTemporalFields(dt, battle);
     this.updateSwordArrays(dt, battle);
+    this.updateFrostLands(dt, battle);
   }
 
   updatePoisonZones(dt, battle) {
@@ -385,6 +402,90 @@ export class HazardZoneManager {
 
         this.swordArrays.splice(i, 1);
         continue;
+      }
+    }
+  }
+
+  updateFrostLands(dt, battle) {
+    const effectSystem = battle.effectSystem;
+    for (let i = this.frostLands.length - 1; i >= 0; i--) {
+      const land = this.frostLands[i];
+      land.duration -= dt;
+      land.tickTimer += dt;
+
+      if (land.caster && land.caster.isAlive && land.caster.isAlive()) {
+        land.caster.x = land.x;
+        land.caster.y = land.y;
+        land.caster.ultInvincibilityTimer = Math.max(land.caster.ultInvincibilityTimer || 0, 0.2);
+        land.caster.frostLandTimer = Math.max(land.caster.frostLandTimer || 0, land.duration);
+      }
+
+      const enemies = getEnemies(land.ownerTeam, battle);
+      if (enemies) {
+        enemies.forEach(enemy => {
+          if (!enemy.isAlive()) return;
+          const dx = enemy.x - land.x;
+          const dy = enemy.y - land.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const pullReach = land.radius + 45;
+          const affectedByFrostLand = dist <= pullReach;
+
+          if (affectedByFrostLand && !enemy.hasPassive('stone_shell')) {
+            const pull = (dist > land.radius ? 150 : 90) * dt;
+            enemy.x -= (dx / dist) * pull;
+            enemy.y -= (dy / dist) * pull;
+          }
+
+          const nextDx = enemy.x - land.x;
+          const nextDy = enemy.y - land.y;
+          const nextDist = Math.sqrt(nextDx * nextDx + nextDy * nextDy) || 1;
+          if (affectedByFrostLand && nextDist > land.radius) {
+            enemy.x = land.x + (nextDx / nextDist) * land.radius;
+            enemy.y = land.y + (nextDy / nextDist) * land.radius;
+          }
+
+          if (affectedByFrostLand && nextDist <= land.radius) {
+            enemy.applySlow(0.25, 0.45);
+          }
+        });
+      }
+
+      if (land.tickTimer >= 0.35) {
+        land.tickTimer = 0;
+        const victims = getEnemies(land.ownerTeam, battle);
+        victims.forEach(enemy => {
+          if (!enemy.isAlive()) return;
+          const dx = enemy.x - land.x;
+          const dy = enemy.y - land.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist <= land.radius) {
+            enemy.takeDamage(land.damage, land.x, land.y, effectSystem);
+            effectSystem.addHitEffect(enemy.x, enemy.y, '#B3E5FC');
+          }
+        });
+      }
+
+      if (Math.random() < 0.55) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * land.radius;
+        effectSystem.addParticle({
+          x: land.x + Math.cos(angle) * dist,
+          y: land.y + Math.sin(angle) * dist,
+          vx: -Math.sin(angle) * 90,
+          vy: Math.cos(angle) * 90,
+          life: 0.35,
+          maxLife: 0.35,
+          color: Math.random() < 0.5 ? '#E1F5FE' : '#81D4FA',
+          size: 2.5,
+          gravity: 0,
+          friction: 0.95,
+          type: 'spark'
+        });
+      }
+
+      if (land.duration <= 0) {
+        if (land.caster) land.caster.frostLandTimer = 0;
+        this.frostLands.splice(i, 1);
       }
     }
   }

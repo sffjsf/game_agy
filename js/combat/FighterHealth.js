@@ -4,7 +4,7 @@ import { safeFinite, safeDirection, clamp } from '../utils.js';
 import * as EffectLib from '../effects_lib/index.js';
 
 export class FighterHealth {
-  static takeDamage(f, damage, attackerX, attackerY, effectSystem) {
+  static takeDamage(f, damage, attackerX, attackerY, effectSystem, options) {
     if (!f.alive) return;
 
     // Sanitise all inputs once at the top
@@ -29,6 +29,15 @@ export class FighterHealth {
     }
 
     damage = FighterHealth.applyDamageReductionPassives(f, damage, effectSystem, attackerX, attackerY);
+    const isBurnDamage = options && options.type === 'burn';
+    const shouldTriggerFrostShield = f.hasPassive && f.hasPassive('frost_shield') && !isBurnDamage;
+    if (shouldTriggerFrostShield) {
+      const cap = f.maxHp * 0.05;
+      if (damage > cap) {
+        damage = cap;
+        effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 18, '冰盾减伤!', false, '#B3E5FC');
+      }
+    }
 
     if (damage <= 0) return;
 
@@ -73,6 +82,10 @@ export class FighterHealth {
     // Passive: Celestial Sword Deity gains a flying sword when taking damage
     if (f.hasPassive('passive_sword_array') && f.alive && f.hp > 0) {
       f.swordCount = Math.min((f.swordCount || 0) + 1, 9);
+    }
+
+    if (shouldTriggerFrostShield && f.alive && f.hp > 0) {
+      FighterHealth.fireFrostShieldBlade(f, effectSystem);
     }
 
     // Visual feedback
@@ -175,5 +188,43 @@ export class FighterHealth {
     var ratio = typeof overrideRatio === 'number' ? overrideRatio : (f.charData.lifesteal || 0);
     if (ratio <= 0 || damage <= 0) return;
     FighterHealth.heal(f, damage * ratio, effectSystem);
+  }
+
+  static fireFrostShieldBlade(f, effectSystem) {
+    if (!f.battleContext || !f.battleContext.opposingTeam) return;
+    const range = 420;
+    const width = 70;
+    const dirX = Math.cos(f.angle);
+    const dirY = Math.sin(f.angle);
+    f.battleContext.opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      const ex = enemy.x - f.x;
+      const ey = enemy.y - f.y;
+      const forward = ex * dirX + ey * dirY;
+      const side = Math.abs(ex * dirY - ey * dirX);
+      if (forward >= 0 && forward <= range && side <= width) {
+        enemy.takeDamage(16, f.x, f.y, effectSystem);
+        enemy.applySlow(1.2, 0.55);
+        effectSystem.addHitEffect(enemy.x, enemy.y, '#B3E5FC');
+      }
+    });
+    for (let i = 0; i < 12; i++) {
+      const forward = Math.random() * range;
+      const side = (Math.random() - 0.5) * width * 2;
+      effectSystem.addParticle({
+        x: f.x + dirX * forward + -dirY * side,
+        y: f.y + dirY * forward + dirX * side,
+        vx: dirX * 260,
+        vy: dirY * 260,
+        life: 0.28,
+        maxLife: 0.28,
+        color: '#B3E5FC',
+        size: 5,
+        gravity: 0,
+        friction: 0.95,
+        type: 'spark'
+      });
+    }
+    effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 20, '大冰刃!', false, '#B3E5FC');
   }
 }

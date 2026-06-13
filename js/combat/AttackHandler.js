@@ -23,6 +23,12 @@ export class AttackHandler {
     if (!f.target || !f.target.isAlive()) return;
 
     if (f.charData.weaponType === 'melee') {
+      if (f.charData.id === 'frost_lord') {
+        AttackHandler.executeFrostLordBasicAttack(f, effectSystem);
+        if (soundSystem) soundSystem.playSkillSound();
+        return;
+      }
+
       if (f.charData.id === 'celestial_sword_deity') {
         AttackHandler.flashToCelestialTargetFront(f, f.target, effectSystem);
 
@@ -450,6 +456,8 @@ export class AttackHandler {
           nextDashStarted = true;
         }
       }
+    } else if (f.dashSkillType === 'frost_staff_pierce') {
+      AttackHandler.resolveFrostLordStaffPierce(f, effectSystem);
     }
 
     // Go to cooldown or reposition (only if we did not transition to next dash)
@@ -692,5 +700,183 @@ export class AttackHandler {
       }
       effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 16, '闪身', false, '#FFF176');
     }
+  }
+
+  static executeFrostLordBasicAttack(f, effectSystem) {
+    const ctx = f.battleContext;
+    if (!ctx || !ctx.opposingTeam) return;
+
+    let nearest = null;
+    let nearestDist = Infinity;
+    ctx.opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      const dx = enemy.x - f.x;
+      const dy = enemy.y - f.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = enemy;
+      }
+    });
+    if (!nearest) return;
+
+    // First hit: guaranteed falling iceberg on nearest target.
+    nearest.takeDamage(f.charData.attackPower, nearest.x, nearest.y - 120, effectSystem);
+    nearest.applyStun(0.5);
+    effectSystem.addDamageNumber(nearest.x, nearest.y - nearest.charData.size - 28, '冰山坠落!', true, '#B3E5FC');
+    EffectLib.addAoeMeleeEffect(effectSystem, nearest.x, nearest.y, '#B3E5FC', 78);
+    for (let i = 0; i < 24; i++) {
+      effectSystem.addParticle({
+        x: nearest.x + (Math.random() - 0.5) * 60,
+        y: nearest.y - 120 - Math.random() * 40,
+        vx: (Math.random() - 0.5) * 45,
+        vy: 220 + Math.random() * 120,
+        life: 0.45,
+        maxLife: 0.45,
+        color: i % 2 === 0 ? '#E1F5FE' : '#81D4FA',
+        size: 4 + Math.random() * 5,
+        gravity: 0,
+        friction: 0.94,
+        type: 'spark'
+      });
+    }
+
+    if (ctx.ownTeam) {
+      const servant = new f.constructor('ice_servant', nearest.x + (Math.random() - 0.5) * 50, nearest.y + (Math.random() - 0.5) * 50, f.team);
+      servant.battleContext = ctx;
+      ctx.ownTeam.push(servant);
+      EffectLib.addCloneEffect(effectSystem, servant.x, servant.y, '#B3E5FC', 42);
+    }
+
+    let lowest = null;
+    ctx.opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      if (!lowest || enemy.hp < lowest.hp) lowest = enemy;
+    });
+    if (!lowest) return;
+
+    const startX = f.x;
+    const startY = f.y;
+    const behindAngle = isFinite(lowest.angle) ? lowest.angle + Math.PI : Math.atan2(f.y - lowest.y, f.x - lowest.x);
+    const offset = (lowest.charData.size || 34) + (f.charData.size || 38) + 22;
+    const rawEndX = lowest.x + Math.cos(behindAngle) * offset;
+    const rawEndY = lowest.y + Math.sin(behindAngle) * offset;
+    const endX = clamp(rawEndX, ctx.arenaX + 30, ctx.arenaX + ctx.arenaWidth - 30);
+    const endY = clamp(rawEndY, ctx.arenaY + 30, ctx.arenaY + ctx.arenaHeight - 30);
+    f.ultInvincibilityTimer = Math.max(f.ultInvincibilityTimer || 0, 0.55);
+    f.setState('dashing_skill');
+    f.dashStartX = startX;
+    f.dashStartY = startY;
+    f.dashTargetX = endX;
+    f.dashTargetY = endY;
+    f.dashDuration = 0.28;
+    f.dashTimer = 0;
+    f.dashSkillType = 'frost_staff_pierce';
+    f.frostStaffTarget = lowest;
+    f.target = lowest;
+
+    effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 18, '冰杖穿身!', false, '#B3E5FC');
+    EffectLib.addDashEffect(effectSystem, f.x, f.y, '#B3E5FC', 38);
+    effectSystem.screenShake(4);
+  }
+
+  static resolveFrostLordStaffPierce(f, effectSystem) {
+    const ctx = f.battleContext;
+    if (!ctx || !ctx.opposingTeam) {
+      f.setState('cooldown');
+      return;
+    }
+
+    const startX = f.dashStartX;
+    const startY = f.dashStartY;
+    const endX = f.dashTargetX;
+    const endY = f.dashTargetY;
+    const pathDx = endX - startX;
+    const pathDy = endY - startY;
+    const pathLen = Math.sqrt(pathDx * pathDx + pathDy * pathDy) || 1;
+    const target = f.frostStaffTarget;
+
+    ctx.opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      const t = Math.max(0, Math.min(1, ((enemy.x - startX) * pathDx + (enemy.y - startY) * pathDy) / (pathLen * pathLen)));
+      const closestX = startX + pathDx * t;
+      const closestY = startY + pathDy * t;
+      const distToPath = Math.sqrt((enemy.x - closestX) ** 2 + (enemy.y - closestY) ** 2);
+      if (enemy === target || distToPath <= 62) {
+        enemy.takeDamage(enemy === target ? 16 : 14, f.x, f.y, effectSystem);
+        enemy.applyStun(1.0);
+        effectSystem.addHitEffect(enemy.x, enemy.y, '#B3E5FC');
+      }
+    });
+
+    if (target && target.isAlive()) {
+      const dx = target.x - f.x;
+      const dy = target.y - f.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= 120) {
+        target.takeDamage(22, f.x, f.y, effectSystem);
+        target.applyStun(1.0);
+        effectSystem.addDamageNumber(target.x, target.y - target.charData.size - 22, '挥杖重击!', true, '#E1F5FE');
+        EffectLib.addAoeMeleeEffect(effectSystem, target.x, target.y, '#B3E5FC', 72);
+      }
+    }
+
+    for (let i = 0; i < 22; i++) {
+      const pct = i / 21;
+      effectSystem.addParticle({
+        x: startX + pathDx * pct,
+        y: startY + pathDy * pct,
+        vx: (Math.random() - 0.5) * 80,
+        vy: (Math.random() - 0.5) * 80,
+        life: 0.35,
+        maxLife: 0.35,
+        color: '#B3E5FC',
+        size: 3,
+        gravity: 0,
+        friction: 0.92,
+        type: 'circle'
+      });
+    }
+    f.frostStaffTarget = null;
+    effectSystem.screenShake(8);
+    f.setState('cooldown');
+  }
+
+  static fireFrostShieldBlade(f, effectSystem) {
+    if (!f || !f.battleContext || !f.battleContext.opposingTeam) return;
+    const range = 420;
+    const width = 70;
+    const dirX = Math.cos(f.angle);
+    const dirY = Math.sin(f.angle);
+    f.battleContext.opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      const ex = enemy.x - f.x;
+      const ey = enemy.y - f.y;
+      const forward = ex * dirX + ey * dirY;
+      const side = Math.abs(ex * dirY - ey * dirX);
+      if (forward >= 0 && forward <= range && side <= width) {
+        enemy.takeDamage(16, f.x, f.y, effectSystem);
+        enemy.applySlow(1.2, 0.55);
+        effectSystem.addHitEffect(enemy.x, enemy.y, '#B3E5FC');
+      }
+    });
+    for (let i = 0; i < 12; i++) {
+      const forward = Math.random() * range;
+      const side = (Math.random() - 0.5) * width * 2;
+      effectSystem.addParticle({
+        x: f.x + dirX * forward + -dirY * side,
+        y: f.y + dirY * forward + dirX * side,
+        vx: dirX * 260,
+        vy: dirY * 260,
+        life: 0.28,
+        maxLife: 0.28,
+        color: '#B3E5FC',
+        size: 5,
+        gravity: 0,
+        friction: 0.95,
+        type: 'spark'
+      });
+    }
+    effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 20, '大冰刃!', false, '#B3E5FC');
   }
 }

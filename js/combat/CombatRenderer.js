@@ -27,6 +27,7 @@ export class CombatRenderer {
       this.drawBurnZones(ctx, state.hazards.burnZones, time);
       this.drawTemporalFields(ctx, state.hazards.temporalFields, time);
       this.drawSwordArrays(ctx, state.hazards.swordArrays, time);
+      this.drawFrostLands(ctx, state.hazards.frostLands, time);
 
       state.fightersLeft.forEach(f => f.render(ctx, time));
       state.fightersRight.forEach(f => f.render(ctx, time));
@@ -342,6 +343,46 @@ export class CombatRenderer {
 
         ctx.restore();
       }
+    });
+  }
+
+  drawFrostLands(ctx, frostLands, time) {
+    if (!frostLands || frostLands.length === 0) return;
+
+    frostLands.forEach(land => {
+      ctx.save();
+      ctx.translate(land.x, land.y);
+
+      ctx.fillStyle = 'rgba(129, 212, 250, 0.08)';
+      ctx.strokeStyle = 'rgba(179, 229, 252, 0.72)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(0, 0, land.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.rotate(time * 5);
+      ctx.strokeStyle = 'rgba(225, 245, 254, 0.55)';
+      ctx.shadowColor = '#81D4FA';
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = 5;
+      for (let i = 0; i < 4; i++) {
+        ctx.rotate(Math.PI / 2);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(land.radius * 0.82, 0);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = 'rgba(179, 229, 252, 0.22)';
+      ctx.lineWidth = 2;
+      for (let r = 0.35; r <= 0.85; r += 0.25) {
+        ctx.beginPath();
+        ctx.arc(0, 0, land.radius * r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
     });
   }
 }

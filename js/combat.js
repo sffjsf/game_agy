@@ -64,6 +64,10 @@ export class CombatManager {
     return this.hazardZoneManager.swordArrays;
   }
 
+  get frostLands() {
+    return this.hazardZoneManager.frostLands;
+  }
+
   _computeArena() {
     const pad = 20;
     this.arenaWidth = this.canvas.width - pad * 2;
@@ -288,6 +292,10 @@ export class CombatManager {
 
   addSwordArray(...args) {
     this.hazardZoneManager.addSwordArray(...args);
+  }
+
+  addFrostLand(...args) {
+    this.hazardZoneManager.addFrostLand(...args);
   }
 
   resolveFighterCollision() {

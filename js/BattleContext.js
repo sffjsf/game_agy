@@ -19,7 +19,7 @@ export class BattleContext {
    * @param {object} [opts.battleCallbacks]
    * @param {array} [opts.temporalFields]
    */
-  constructor({ weaponSystem, effectSystem, arenaWidth, arenaHeight, arenaX, arenaY, opposingTeam, ownTeam, battleCallbacks, temporalFields, swordArrays }) {
+  constructor({ weaponSystem, effectSystem, arenaWidth, arenaHeight, arenaX, arenaY, opposingTeam, ownTeam, battleCallbacks, temporalFields, swordArrays, frostLands }) {
     this.weaponSystem = weaponSystem;
     this.effectSystem = effectSystem;
 
@@ -35,6 +35,7 @@ export class BattleContext {
 
     this.temporalFields = temporalFields || [];
     this.swordArrays = swordArrays || [];
+    this.frostLands = frostLands || [];
 
     // Cross-cutting callbacks (poison zones, area damage, gravity wells, burn zones)
     this.addPoisonZone = (battleCallbacks && battleCallbacks.addPoisonZone) || null;
@@ -43,5 +44,6 @@ export class BattleContext {
     this.addBurnZone = (battleCallbacks && battleCallbacks.addBurnZone) || null;
     this.addTemporalField = (battleCallbacks && battleCallbacks.addTemporalField) || null;
     this.addSwordArray = (battleCallbacks && battleCallbacks.addSwordArray) || null;
+    this.addFrostLand = (battleCallbacks && battleCallbacks.addFrostLand) || null;
   }
 }

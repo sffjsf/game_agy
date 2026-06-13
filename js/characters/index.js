@@ -43,6 +43,8 @@ import { tidebringer } from './Tidebringer.js';
 import { tide_summon } from './TideSummon.js';
 import { time_traveler } from './TimeTraveler.js';
 import { celestial_sword_deity } from './CelestialSwordDeity.js';
+import { frost_lord } from './FrostLord.js';
+import { ice_servant } from './IceServant.js';
 
 /**
  * Required fields every character data object must have.
@@ -172,7 +174,9 @@ export const characterData = {
   tidebringer,
   tide_summon,
   time_traveler,
-  celestial_sword_deity
+  celestial_sword_deity,
+  frost_lord,
+  ice_servant
 };
 
 // ── Validate all characters on import (dev-only safety net) ──

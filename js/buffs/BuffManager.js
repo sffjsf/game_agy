@@ -153,7 +153,7 @@ export class BuffManager {
     this.burnTick -= dt;
     if (this.burnTick <= 0) {
       this.burnTick = 0.5;
-      f.takeDamage(this.burnDps * 0.5, f.x, f.y, effectSystem);
+      f.takeDamage(this.burnDps * 0.5, f.x, f.y, effectSystem, { type: 'burn' });
       effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 16, '着火', false, '#FFAB00');
       EffectLib.addFireBurstEffect(effectSystem, f.x, f.y, '#FF5722', 24);
     }

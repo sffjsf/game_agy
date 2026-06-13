@@ -360,6 +360,7 @@ export class Fighter {
     this.invisibleTimer = Math.max(0, (this.invisibleTimer || 0) - dt);
     this.bleedTimer = Math.max(0, (this.bleedTimer || 0) - dt);
     this.ultInvincibilityTimer = Math.max(0, (this.ultInvincibilityTimer || 0) - dt);
+    this.frostLandTimer = Math.max(0, (this.frostLandTimer || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 
     if (AttackHandler.updateCelestialBasicSwordBarrage(this, dt, effectSystem)) {
@@ -413,6 +414,15 @@ export class Fighter {
     if (this.buffs.isStunned()) {
       this.x = clamp(this.x, arenaX + 30, arenaX + arenaWidth - 30);
       this.y = clamp(this.y, arenaY + 30, arenaY + arenaHeight - 30);
+      return;
+    }
+
+    if (this.frostLandTimer > 0) {
+      this.angle += dt * 18;
+      this.ultInvincibilityTimer = Math.max(this.ultInvincibilityTimer || 0, 0.2);
+      if (Math.random() < 0.55) {
+        effectSystem.addTrail(this.x, this.y, '#B3E5FC', 8);
+      }
       return;
     }
 
@@ -612,7 +622,7 @@ export class Fighter {
       // DASHING_SKILL: Slide smoothly towards the target location
       // ───────────────────────────────────────────────
       case 'dashing_skill':
-        if (this.dashSkillType !== 'blazing_stampede' && (!this.target || !this.target.isAlive())) {
+        if (this.dashSkillType !== 'blazing_stampede' && this.dashSkillType !== 'frost_staff_pierce' && (!this.target || !this.target.isAlive())) {
           this.setState('chase');
           break;
         }
@@ -929,8 +939,8 @@ export class Fighter {
    * @param {number} attackerY - Attacker Y position (for knockback)
    * @param {EffectSystem} effectSystem - For visual feedback
    */
-  takeDamage(damage, attackerX, attackerY, effectSystem) {
-    FighterHealth.takeDamage(this, damage, attackerX, attackerY, effectSystem);
+  takeDamage(damage, attackerX, attackerY, effectSystem, options) {
+    FighterHealth.takeDamage(this, damage, attackerX, attackerY, effectSystem, options);
   }
 
   /**
