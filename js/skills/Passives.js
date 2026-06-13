@@ -359,6 +359,9 @@ export function reviveRandomAlly(fighter, effectSystem, includeSelf) {
 
 export function triggerDawnKillRevive(fighter, effectSystem) {
   if (!fighter || !fighter.hasPassive || !fighter.hasPassive('dawn_resurrection')) return null;
+  if (fighter.dawnResurrectionCooldown > 0) return null;
+
+  fighter.dawnResurrectionCooldown = 5.0;
   const revived = reviveRandomAlly(fighter, effectSystem, false);
   if (revived) {
     effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 24, '黎明复苏!', false, '#FFF176');

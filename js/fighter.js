@@ -119,6 +119,7 @@ export class Fighter {
 
     // Dawn Goddess mechanics
     this.dawnSpeedTimer = 0;
+    this.dawnResurrectionCooldown = 0;
     this.finalSunriseUsed = false;
 
     // Channeling skill state (e.g. Berserker whirlwind)
@@ -212,6 +213,7 @@ export class Fighter {
     this.counterStanceTimer = Math.max(0, (this.counterStanceTimer || 0) - dt);
     this.smokeDodgeTimer = Math.max(0, (this.smokeDodgeTimer || 0) - dt);
     this.dawnSpeedTimer = Math.max(0, (this.dawnSpeedTimer || 0) - dt);
+    this.dawnResurrectionCooldown = Math.max(0, (this.dawnResurrectionCooldown || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 
     this.updatePassiveTimers(dt);
