@@ -1,12 +1,12 @@
 import * as Passives from './skills/Passives.js';
 import { FighterAI } from './ai/FighterAI.js';
 import { characterData } from './characters/index.js';
-import { soundSystem } from './audio.js';
 import { safeFinite, safeDirection, clamp, normaliseAngle } from './utils.js';
 import { BuffManager } from './buffs/BuffManager.js';
-import { BattleContext } from './BattleContext.js';
 import { FighterRenderer } from './rendering/FighterRenderer.js';
 import { AttackHandler } from './combat/AttackHandler.js';
+import { FighterHealth } from './combat/FighterHealth.js';
+import { SkillCastPresenter } from './skills/SkillCastPresenter.js';
 import { isChannelingSkill, executeChannelTick, executeChannelDamage } from './skills/SkillRegistry.js';
 
 /**
@@ -612,13 +612,7 @@ export class Fighter {
    * @param {string=} displayName
    */
   startSkillCast(effectSystem, skill, displayName) {
-    if (!skill) return;
-
-    this.skillCooldown = skill.cooldown || 0;
-    this.skillReady = false;
-
-    if (soundSystem) soundSystem.playSkillSound();
-    this.showSkillName(effectSystem, displayName || skill.name);
+    SkillCastPresenter.startSkillCast(this, effectSystem, skill, displayName);
   }
 
   /**
@@ -627,8 +621,7 @@ export class Fighter {
    * @param {string} skillName
    */
   showSkillName(effectSystem, skillName) {
-    if (!effectSystem || !skillName) return;
-    effectSystem.addSkillName(this.x, this.y - this.charData.size - 34, skillName, this.team);
+    SkillCastPresenter.showSkillName(this, effectSystem, skillName);
   }
 
   /**
@@ -688,71 +681,7 @@ export class Fighter {
    * @param {EffectSystem} effectSystem - For visual feedback
    */
   takeDamage(damage, attackerX, attackerY, effectSystem) {
-    if (!this.alive) return;
-
-    // Sanitise all inputs once at the top
-    this.x  = safeFinite(this.x, 400);
-    this.y  = safeFinite(this.y, 300);
-    this.hp = safeFinite(this.hp, this.maxHp);
-    damage   = safeFinite(damage, 0);
-    attackerX = safeFinite(attackerX, this.x);
-    attackerY = safeFinite(attackerY, this.y);
-
-    if (this.tryDamageAvoidancePassives(effectSystem)) return;
-    damage = this.applyDamageReductionPassives(damage, effectSystem);
-
-    if (damage <= 0) return;
-
-    this.hp -= damage;
-    this.hp = clamp(this.hp, 0, this.maxHp);
-
-    // Visual feedback
-    this.hitFlashTimer = 0.15;
-    effectSystem.addHitEffect(this.x, this.y, this.charData.color);
-    const damageColor = this.team === 'left' ? '#FF5252' : '#29B6F6';
-    effectSystem.addDamageNumber(this.x, this.y - this.charData.size, damage, false, damageColor);
-
-     // Play hit sound
-    if (soundSystem) soundSystem.playHitSound();
-
-    // Blazing wings passive: burn the closest enemy to the attack position
-    if (this.hasPassive('blazing_wings') && this.battleContext && this.battleContext.opposingTeam) {
-      let closestAttacker = null;
-      let minDistance = Infinity;
-      this.battleContext.opposingTeam.forEach(enemy => {
-        if (!enemy.isAlive()) return;
-        const dx = enemy.x - attackerX;
-        const dy = enemy.y - attackerY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < minDistance) {
-          minDistance = dist;
-          closestAttacker = enemy;
-        }
-      });
-      if (closestAttacker) {
-        closestAttacker.applyBurn(2.0, 6.0);
-      }
-    }
-
-    // Knockback (5-8px away from attacker)
-    if (!this.hasPassive('stone_shell')) {
-      const kb = safeDirection(this.x - attackerX, this.y - attackerY);
-      var kbDist = 5 + Math.random() * 3;
-      this.x += kb.dx * kbDist;
-      this.y += kb.dy * kbDist;
-    }
-
-    // State transition
-    if (this.hp <= 0) {
-      if (this.tryLethalSurvivalPassives(effectSystem)) {
-        this.setState('chase');
-      } else {
-        if (soundSystem) soundSystem.playDeathSound();
-        this.setState('dead');
-      }
-    } else if (this.state !== 'attack' && this.state !== 'skill' && this.state !== 'reposition' && this.state !== 'dashing_skill' && this.state !== 'channeling' && this.state !== 'dead') {
-      this.setState('hit');
-    }
+    FighterHealth.takeDamage(this, damage, attackerX, attackerY, effectSystem);
   }
 
   /**
@@ -761,10 +690,7 @@ export class Fighter {
    * @param {EffectSystem} effectSystem - For visual feedback
    */
   heal(amount, effectSystem) {
-    if (!this.alive) return;
-    amount = safeFinite(amount, 0);
-    this.hp = clamp(this.hp + amount, 0, this.maxHp);
-    effectSystem.addHealEffect(this.x, this.y);
+    FighterHealth.heal(this, amount, effectSystem);
   }
 
   /**
@@ -773,7 +699,7 @@ export class Fighter {
    * @returns {boolean} True when damage should be cancelled
    */
   tryDamageAvoidancePassives(effectSystem) {
-    return Passives.tryDamageAvoidancePassives(this, effectSystem);
+    return FighterHealth.tryDamageAvoidancePassives(this, effectSystem);
   }
 
   /**
@@ -783,7 +709,7 @@ export class Fighter {
    * @returns {number} Remaining damage
    */
   applyDamageReductionPassives(damage, effectSystem) {
-    return Passives.applyDamageReductionPassives(this, damage, effectSystem);
+    return FighterHealth.applyDamageReductionPassives(this, damage, effectSystem);
   }
 
   /**
@@ -792,7 +718,7 @@ export class Fighter {
    * @returns {boolean} True when lethal damage was cancelled
    */
   tryLethalSurvivalPassives(effectSystem) {
-    return Passives.tryLethalSurvivalPassives(this, effectSystem);
+    return FighterHealth.tryLethalSurvivalPassives(this, effectSystem);
   }
 
   /**
@@ -802,9 +728,7 @@ export class Fighter {
    * @param {number=} overrideRatio
    */
   healFromDamage(damage, effectSystem, overrideRatio) {
-    var ratio = typeof overrideRatio === 'number' ? overrideRatio : (this.charData.lifesteal || 0);
-    if (ratio <= 0 || damage <= 0) return;
-    this.heal(damage * ratio, effectSystem);
+    FighterHealth.healFromDamage(this, damage, effectSystem, overrideRatio);
   }
 
   /**
