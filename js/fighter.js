@@ -896,6 +896,8 @@ export class Fighter {
    * @param {number} dt
    */
   updateAutomaticPassives(opposingTeam, effectSystem, dt) {
+    if (!this.alive || this.state === 'dead') return;
+
     if (this.hasPassive('steam_whistle')) {
       this.trySteamWhistle(opposingTeam, effectSystem);
     }

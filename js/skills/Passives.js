@@ -500,6 +500,7 @@ export function triggerFinalSunrise(fighter, effectSystem) {
 }
 
 export function trySentryDrones(fighter, opposingTeam, effectSystem, dt) {
+  if (!fighter || !fighter.alive || fighter.state === 'dead') return;
   if (!opposingTeam || fighter.isStunned()) return;
 
   if (fighter.sentryDroneTimer === undefined) {
