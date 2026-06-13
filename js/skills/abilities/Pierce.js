@@ -19,6 +19,9 @@ export function executePierce(caster, skill, weaponSystem, effectSystem, dx, dy,
       const side = Math.abs(ex * dirY - ey * dirX);
       if (forward >= 0 && forward <= range && side <= width) {
         enemy.takeDamage(skill.damage, caster.x, caster.y, effectSystem);
+        if (skill.slowDuration) {
+          enemy.applySlow(skill.slowDuration, skill.slowMultiplier || 0.6);
+        }
         effectSystem.addHitEffect(enemy.x, enemy.y, caster.charData.color);
       }
     });

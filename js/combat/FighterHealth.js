@@ -15,7 +15,7 @@ export class FighterHealth {
     attackerY = safeFinite(attackerY, f.y);
 
     if (FighterHealth.tryDamageAvoidancePassives(f, effectSystem)) return;
-    damage = FighterHealth.applyDamageReductionPassives(f, damage, effectSystem);
+    damage = FighterHealth.applyDamageReductionPassives(f, damage, effectSystem, attackerX, attackerY);
 
     if (damage <= 0) return;
 
@@ -82,8 +82,8 @@ export class FighterHealth {
     return Passives.tryDamageAvoidancePassives(f, effectSystem);
   }
 
-  static applyDamageReductionPassives(f, damage, effectSystem) {
-    return Passives.applyDamageReductionPassives(f, damage, effectSystem);
+  static applyDamageReductionPassives(f, damage, effectSystem, attackerX, attackerY) {
+    return Passives.applyDamageReductionPassives(f, damage, effectSystem, attackerX, attackerY);
   }
 
   static tryLethalSurvivalPassives(f, effectSystem) {

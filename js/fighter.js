@@ -715,8 +715,8 @@ export class Fighter {
    * @param {EffectSystem} effectSystem
    * @returns {number} Remaining damage
    */
-  applyDamageReductionPassives(damage, effectSystem) {
-    return FighterHealth.applyDamageReductionPassives(this, damage, effectSystem);
+  applyDamageReductionPassives(damage, effectSystem, attackerX, attackerY) {
+    return FighterHealth.applyDamageReductionPassives(this, damage, effectSystem, attackerX, attackerY);
   }
 
   /**

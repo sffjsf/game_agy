@@ -194,7 +194,18 @@ export function tryDamageAvoidancePassives(fighter, effectSystem) {
   return false;
 }
 
-export function applyDamageReductionPassives(fighter, damage, effectSystem) {
+export function applyDamageReductionPassives(fighter, damage, effectSystem, attackerX, attackerY) {
+  if (fighter.hasPassive('shield_wall') && attackerX !== undefined && attackerY !== undefined) {
+    const attackAngle = Math.atan2(attackerY - fighter.y, attackerX - fighter.x);
+    let angleDiff = attackAngle - fighter.angle;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    if (Math.abs(angleDiff) <= Math.PI * 0.45) {
+      damage *= 0.75;
+      effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '盾阵减伤!', false, '#CFD8DC');
+    }
+  }
+
   if (fighter.hasPassive('stone_shell')) {
     damage *= 0.9; // 10% damage reduction
     const maxDamageCap = fighter.maxHp * 0.15;

@@ -62,6 +62,18 @@ export class AttackHandler {
         f.target.takeDamage(finalDamage, f.x, f.y, effectSystem);
         f.healFromDamage(finalDamage, effectSystem);
 
+        // Shield wall: melee attackers can be knocked back by the target's shield
+        if (f.target.isAlive() && f.target.hasPassive('shield_wall') && Math.random() < 0.3) {
+          const kbDx = f.x - f.target.x;
+          const kbDy = f.y - f.target.y;
+          const kbDist = Math.sqrt(kbDx * kbDx + kbDy * kbDy) || 1;
+          f.x += (kbDx / kbDist) * 70;
+          f.y += (kbDy / kbDist) * 70;
+          f.applySlow(0.8, 0.65);
+          effectSystem.addHitEffect(f.x, f.y, '#CFD8DC');
+          effectSystem.addDamageNumber(f.x, f.y - f.charData.size, '盾反!', false, '#CFD8DC');
+        }
+
         // Bounty mark: on-kill permanent attack speed boost (max 25 stacks)
         if (!f.target.isAlive() && f.hasPassive('bounty_mark')) {
           f.bountyHunterStacks = Math.min((f.bountyHunterStacks || 0) + 1, 25);

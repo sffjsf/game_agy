@@ -25,6 +25,7 @@ import { mecha_pioneer } from './MechaPioneer.js';
 import { seraph } from './Seraph.js';
 import { bounty_hunter } from './BountyHunter.js';
 import { wind_dancer } from './WindDancer.js';
+import { shield_lancer } from './ShieldLancer.js';
 
 /**
  * Required fields every character data object must have.
@@ -136,7 +137,8 @@ export const characterData = {
   mecha_pioneer,
   seraph,
   bounty_hunter,
-  wind_dancer
+  wind_dancer,
+  shield_lancer
 };
 
 // ── Validate all characters on import (dev-only safety net) ──
