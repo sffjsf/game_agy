@@ -341,7 +341,8 @@ export class FighterRenderer {
       const alpha = Math.min(1.0, nameTimer / 1.2);
       ctx.globalAlpha = alpha;
       
-      const nameText = (f.charData.isHero ? '⭐' : '') + (f.charData.nameCN || f.charData.name);
+      const tierIcon = f.charData.isLegendary ? '👑' : (f.charData.isHero ? '⭐' : '');
+      const nameText = tierIcon + (f.charData.nameCN || f.charData.name);
       ctx.font = "bold 30px 'Noto Sans SC', 'Outfit', sans-serif";
       
       const teamColor = f.team === 'left' ? '#00E5FF' : '#FF3D00';

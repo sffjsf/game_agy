@@ -59,6 +59,7 @@ export class UIManager {
 
     const charIds = Object.keys(characterData);
     
+    const legends = [];
     const heroes = [];
     const regulars = [];
 
@@ -66,18 +67,22 @@ export class UIManager {
       const char = characterData[id];
       if (char.hidden) return; // Hide summoned minions from selection
       
-      if (char.isHero) {
+      if (char.isLegendary) {
+        legends.push({ id, char });
+      } else if (char.isHero) {
         heroes.push({ id, char });
       } else {
         regulars.push({ id, char });
       }
     });
 
-    this._buildCategory('普通战士', regulars, 'left', this.leftGrid);
+    this._buildCategory('传说级角色', legends, 'left', this.leftGrid);
     this._buildCategory('英雄角色', heroes, 'left', this.leftGrid);
+    this._buildCategory('普通战士', regulars, 'left', this.leftGrid);
     
-    this._buildCategory('普通战士', regulars, 'right', this.rightGrid);
+    this._buildCategory('传说级角色', legends, 'right', this.rightGrid);
     this._buildCategory('英雄角色', heroes, 'right', this.rightGrid);
+    this._buildCategory('普通战士', regulars, 'right', this.rightGrid);
 
     // Keep existing selections, just refresh visuals
     this._updateGridVisuals('left');
@@ -146,7 +151,9 @@ export class UIManager {
 
   _createCard(charId, char, side) {
     const card = document.createElement('div');
-    card.className = char.isHero ? 'character-card is-hero' : 'character-card';
+    card.className = char.isLegendary
+      ? 'character-card is-legendary'
+      : (char.isHero ? 'character-card is-hero' : 'character-card');
     card.dataset.charId = charId;
     card.dataset.side = side;
 
@@ -174,12 +181,11 @@ export class UIManager {
     card.appendChild(name);
     card.appendChild(stats);
 
-    // Hero badge for superheroes
-    const isHero = char.isHero;
-    if (isHero) {
+    // Tier badge for elevated characters
+    if (char.isLegendary || char.isHero) {
       const badge = document.createElement('div');
-      badge.className = 'hero-badge';
-      badge.textContent = '⭐ 英雄';
+      badge.className = char.isLegendary ? 'legendary-badge' : 'hero-badge';
+      badge.textContent = char.isLegendary ? '👑 传说' : '⭐ 英雄';
       card.appendChild(badge);
     }
 
@@ -470,24 +476,33 @@ export class UIManager {
     
     const tabRegular = document.getElementById('codex-tab-regular');
     const tabHero = document.getElementById('codex-tab-hero');
+    const tabLegendary = document.getElementById('codex-tab-legendary');
     this.currentCodexFilter = 'regular'; // Default filter
+
+    const setCodexTab = (filter) => {
+      this.currentCodexFilter = filter;
+      if (tabRegular) tabRegular.classList.toggle('active', filter === 'regular');
+      if (tabHero) tabHero.classList.toggle('active', filter === 'hero');
+      if (tabLegendary) tabLegendary.classList.toggle('active', filter === 'legendary');
+      this._populateCodex();
+    };
 
     if (tabRegular) {
       tabRegular.addEventListener('click', () => {
         if (soundSystem) soundSystem.playClickSound();
-        this.currentCodexFilter = 'regular';
-        tabRegular.classList.add('active');
-        if (tabHero) tabHero.classList.remove('active');
-        this._populateCodex();
+        setCodexTab('regular');
       });
     }
     if (tabHero) {
       tabHero.addEventListener('click', () => {
         if (soundSystem) soundSystem.playClickSound();
-        this.currentCodexFilter = 'hero';
-        tabHero.classList.add('active');
-        if (tabRegular) tabRegular.classList.remove('active');
-        this._populateCodex();
+        setCodexTab('hero');
+      });
+    }
+    if (tabLegendary) {
+      tabLegendary.addEventListener('click', () => {
+        if (soundSystem) soundSystem.playClickSound();
+        setCodexTab('legendary');
       });
     }
 
@@ -497,10 +512,7 @@ export class UIManager {
           soundSystem.init();
           soundSystem.playClickSound();
         }
-        this.currentCodexFilter = 'regular';
-        if (tabRegular) tabRegular.classList.add('active');
-        if (tabHero) tabHero.classList.remove('active');
-        this._populateCodex();
+        setCodexTab('regular');
         this.showScreen('codex');
       });
     }
@@ -605,9 +617,10 @@ export class UIManager {
     charIds.forEach(id => {
       const char = characterData[id];
 
-      // Filter by regular vs hero tab
-      if (filter === 'hero' && !char.isHero) return;
-      if (filter === 'regular' && char.isHero) return;
+      // Filter by tier tab; legendary is above hero and does not duplicate there.
+      if (filter === 'legendary' && !char.isLegendary) return;
+      if (filter === 'hero' && (!char.isHero || char.isLegendary)) return;
+      if (filter === 'regular' && (char.isHero || char.isLegendary)) return;
 
       // Only show visible characters in codex (unless we want to show hidden minions too? Let's show all to be fully detailed)
       const isHidden = char.hidden ? '<span style="color: #ff5252; font-size: 0.8em; margin-left: 8px;">(隐藏角色)</span>' : '';
@@ -640,8 +653,9 @@ export class UIManager {
         </div>
       `;
       
-      const isHero = char.isHero;
-      const badgeHtml = isHero ? '<div class="hero-badge">⭐ 英雄</div>' : '';
+      const badgeHtml = char.isLegendary
+        ? '<div class="legendary-badge">👑 传说</div>'
+        : (char.isHero ? '<div class="hero-badge">⭐ 英雄</div>' : '');
 
       card.innerHTML = `
         ${badgeHtml}

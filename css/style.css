@@ -254,6 +254,11 @@ html, body {
   border-color: rgba(255, 215, 0, 0.45);
 }
 
+.character-card.is-legendary {
+  border-color: rgba(255, 64, 129, 0.75);
+  background: linear-gradient(145deg, rgba(255, 64, 129, 0.14), rgba(255, 215, 0, 0.08)), var(--surface);
+}
+
 .character-card:hover {
   transform: scale(1.04);
   background: var(--card-hover);
@@ -295,6 +300,24 @@ html, body {
   border-radius: 3px;
   text-shadow: 0 0 2px rgba(255, 215, 0, 0.6);
   box-shadow: 0 0 3px rgba(255, 215, 0, 0.2);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.legendary-badge {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 7px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #880E4F, #FF4081 55%, #FFD700);
+  border: 1px solid #FFD700;
+  padding: 0px 4px;
+  border-radius: 3px;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 6px rgba(255, 64, 129, 0.55);
   user-select: none;
   white-space: nowrap;
 }
@@ -827,6 +850,12 @@ html, body {
   background: linear-gradient(135deg, #FFD700, #FF8C00);
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
   color: #1a1a1a;
+}
+
+#codex-tab-legendary.active {
+  background: linear-gradient(135deg, #880E4F, #FF4081 55%, #FFD700);
+  box-shadow: 0 0 12px rgba(255, 64, 129, 0.55);
+  color: #fff;
 }
 
 .codex-header h1 {

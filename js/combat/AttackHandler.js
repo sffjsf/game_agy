@@ -3,6 +3,7 @@ import * as Passives from '../skills/Passives.js';
 import { executeSkillStrategy } from '../skills/SkillRegistry.js';
 import { soundSystem } from '../audio.js';
 import { getArenaBoundaryIntersection } from '../skills/abilities/BlazingStampede.js';
+import { clamp } from '../utils.js';
 
 /**
  * AttackHandler - Executes attacks, skills, and dashing-skill payloads for a Fighter.
@@ -23,6 +24,8 @@ export class AttackHandler {
 
     if (f.charData.weaponType === 'melee') {
       if (f.charData.id === 'celestial_sword_deity') {
+        AttackHandler.flashToCelestialTargetFront(f, f.target, effectSystem);
+
         // 1. Release active passive swords in a fan shape towards target
         if (f.swordCount > 0) {
           const count = f.swordCount;
@@ -61,7 +64,10 @@ export class AttackHandler {
           f.battleContext.opposingTeam
         );
 
-        // 3. Passive: gain a sword on attack
+        // 3. Legendary second strike: instant target-area sword-piercing barrage.
+        AttackHandler.executeCelestialBasicSwordBarrage(f, f.target, effectSystem);
+
+        // 4. Passive: gain a sword only from the original basic attack.
         f.swordCount = Math.min((f.swordCount || 0) + 1, 9);
 
         if (soundSystem) soundSystem.playSwingSound();
@@ -455,6 +461,236 @@ export class AttackHandler {
         f.repositionType = (f.charData.weaponType === 'ranged') ? 'retreat' : (Math.random() < 0.65 ? 'circle' : 'retreat');
         f.circleDir = Math.random() < 0.5 ? 1 : -1;
       }
+    }
+  }
+
+  /**
+   * 九霄剑仙普攻第二段：在被攻击目标圆形区域内触发万剑归宗穿刺。
+   * Starts a fixed 10-hit barrage over normal game time and intentionally does not grant swordCount.
+   */
+  static executeCelestialBasicSwordBarrage(f, target, effectSystem) {
+    if (!target || !target.isAlive() || !f.battleContext || !f.battleContext.opposingTeam) return;
+
+    const centerX = target.x;
+    const centerY = target.y;
+    const radius = 155;
+    const hitCount = 10;
+    const hitDamage = 4;
+    const stunDuration = 1.8;
+
+    f.celestialBasicBarrage = {
+      centerX,
+      centerY,
+      radius,
+      hitCount,
+      hitDamage,
+      hitIndex: 0,
+      dashTimer: 0,
+      dashDuration: 0.14,
+      pauseTimer: 0,
+      pauseDuration: 0.04,
+      phase: 'dash',
+      startX: f.x,
+      startY: f.y,
+      endX: f.x,
+      endY: f.y,
+      stunnedTargets: []
+    };
+
+    f.battleContext.opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      const dx = enemy.x - centerX;
+      const dy = enemy.y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= radius + enemy.charData.size) {
+        enemy.applyStun(stunDuration);
+        f.celestialBasicBarrage.stunnedTargets.push(enemy);
+        EffectLib.addStunEffect(effectSystem, enemy.x, enemy.y, '#FFD700', 26);
+      }
+    });
+
+    AttackHandler.prepareCelestialBarrageDash(f, f.celestialBasicBarrage, effectSystem);
+    f.ultInvincibilityTimer = Math.max(f.ultInvincibilityTimer || 0, 1.8);
+
+    effectSystem.addParticle({
+      x: centerX,
+      y: centerY,
+      vx: 0,
+      vy: 0,
+      life: 0.6,
+      maxLife: 0.6,
+      color: 'rgba(255, 215, 0, 0.85)',
+      size: radius,
+      gravity: 0,
+      friction: 1,
+      type: 'ring'
+    });
+    effectSystem.addDamageNumber(centerX, centerY - radius * 0.55, '万剑归宗', false, '#FFD700');
+    effectSystem.screenShake(5);
+  }
+
+  static updateCelestialBasicSwordBarrage(f, dt, effectSystem) {
+    const barrage = f.celestialBasicBarrage;
+    if (!barrage || !f.battleContext || !f.battleContext.opposingTeam) return false;
+
+    f.ultInvincibilityTimer = Math.max(f.ultInvincibilityTimer || 0, 0.18);
+
+    if (barrage.phase === 'dash') {
+      barrage.dashTimer += dt;
+      const duration = barrage.dashDuration || 0.14;
+      const pct = Math.min(1, barrage.dashTimer / duration);
+
+      f.x = barrage.startX + (barrage.endX - barrage.startX) * pct;
+      f.y = barrage.startY + (barrage.endY - barrage.startY) * pct;
+      f.angle = Math.atan2(barrage.endY - barrage.startY, barrage.endX - barrage.startX);
+
+      effectSystem.addTrail(f.x, f.y, '#FFD700', 8);
+      if (Math.random() < 0.65) {
+        effectSystem.addParticle({
+          x: f.x + (Math.random() - 0.5) * 14,
+          y: f.y + (Math.random() - 0.5) * 14,
+          vx: (Math.random() - 0.5) * 50,
+          vy: (Math.random() - 0.5) * 50,
+          life: 0.28,
+          maxLife: 0.28,
+          color: '#FFF59D',
+          size: 3,
+          gravity: 0,
+          friction: 0.92,
+          type: 'circle'
+        });
+      }
+
+      if (pct >= 1) {
+        f.x = barrage.endX;
+        f.y = barrage.endY;
+        AttackHandler.resolveCelestialBasicSwordHit(f, barrage, effectSystem);
+        barrage.hitIndex++;
+        barrage.phase = 'pause';
+        barrage.pauseTimer = 0;
+      }
+    } else {
+      barrage.pauseTimer += dt;
+      if (barrage.pauseTimer >= barrage.pauseDuration) {
+        if (barrage.hitIndex >= barrage.hitCount) {
+          f.celestialBasicBarrage = null;
+          f.setState('cooldown');
+        } else {
+          AttackHandler.prepareCelestialBarrageDash(f, barrage, effectSystem);
+        }
+      }
+    }
+
+    return true;
+  }
+
+  static prepareCelestialBarrageDash(f, barrage, effectSystem) {
+    const currentAngle = Math.atan2(f.y - barrage.centerY, f.x - barrage.centerX);
+    const weave = (barrage.hitIndex % 2 === 0 ? 0.36 : -0.36);
+    const endAngle = currentAngle + Math.PI + weave;
+    const startX = f.x;
+    const startY = f.y;
+    const endX = barrage.centerX + Math.cos(endAngle) * barrage.radius;
+    const endY = barrage.centerY + Math.sin(endAngle) * barrage.radius;
+    const ctx = f.battleContext;
+
+    barrage.startX = ctx ? clamp(startX, ctx.arenaX + 30, ctx.arenaX + ctx.arenaWidth - 30) : startX;
+    barrage.startY = ctx ? clamp(startY, ctx.arenaY + 30, ctx.arenaY + ctx.arenaHeight - 30) : startY;
+    barrage.endX = ctx ? clamp(endX, ctx.arenaX + 30, ctx.arenaX + ctx.arenaWidth - 30) : endX;
+    barrage.endY = ctx ? clamp(endY, ctx.arenaY + 30, ctx.arenaY + ctx.arenaHeight - 30) : endY;
+    barrage.dashTimer = 0;
+    barrage.phase = 'dash';
+
+    f.angle = Math.atan2(barrage.endY - barrage.startY, barrage.endX - barrage.startX);
+
+    EffectLib.addDashEffect(effectSystem, f.x, f.y, '#FFD700', 30);
+  }
+
+  static resolveCelestialBasicSwordHit(f, barrage, effectSystem) {
+    const centerX = barrage.centerX;
+    const centerY = barrage.centerY;
+    const radius = barrage.radius;
+    const hitIndex = barrage.hitIndex;
+    const startX = barrage.startX;
+    const startY = barrage.startY;
+    const endX = barrage.endX;
+    const endY = barrage.endY;
+    const pathDx = endX - startX;
+    const pathDy = endY - startY;
+    const pathLen = Math.sqrt(pathDx * pathDx + pathDy * pathDy) || 1;
+
+    f.battleContext.opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      const t = Math.max(0, Math.min(1, ((enemy.x - startX) * pathDx + (enemy.y - startY) * pathDy) / (pathLen * pathLen)));
+      const closestX = startX + pathDx * t;
+      const closestY = startY + pathDy * t;
+      const distToPath = Math.sqrt((enemy.x - closestX) * (enemy.x - closestX) + (enemy.y - closestY) * (enemy.y - closestY));
+      const dx = enemy.x - centerX;
+      const dy = enemy.y - centerY;
+      const distToCenter = Math.sqrt(dx * dx + dy * dy);
+      if (distToPath <= 82 && distToCenter <= radius + enemy.charData.size) {
+        enemy.takeDamage(barrage.hitDamage, centerX, centerY, effectSystem);
+        effectSystem.addHitEffect(enemy.x, enemy.y, '#FFD700');
+      }
+    });
+
+    effectSystem.addParticle({
+      x: centerX,
+      y: centerY,
+      vx: 0,
+      vy: 0,
+      life: 0.2,
+      maxLife: 0.2,
+      color: hitIndex % 2 === 0 ? 'rgba(255, 253, 231, 0.85)' : 'rgba(255, 215, 0, 0.85)',
+      size: radius * 0.25,
+      gravity: 0,
+      friction: 1,
+      type: 'ring'
+    });
+    effectSystem.screenShake(2);
+  }
+
+  static flashToCelestialTargetFront(f, target, effectSystem) {
+    if (!target || !target.isAlive()) return;
+
+    const dx = target.x - f.x;
+    const dy = target.y - f.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const flashRange = 240;
+    if (!isFinite(dist) || dist > flashRange) return;
+
+    const frontAngle = isFinite(target.angle) ? target.angle : Math.atan2(f.y - target.y, f.x - target.x);
+    const offset = (target.charData.size || 34) + (f.charData.size || 34) + 16;
+    const nextX = target.x + Math.cos(frontAngle) * offset;
+    const nextY = target.y + Math.sin(frontAngle) * offset;
+    const ctx = f.battleContext;
+
+    const oldX = f.x;
+    const oldY = f.y;
+    f.x = ctx ? clamp(nextX, ctx.arenaX + 30, ctx.arenaX + ctx.arenaWidth - 30) : nextX;
+    f.y = ctx ? clamp(nextY, ctx.arenaY + 30, ctx.arenaY + ctx.arenaHeight - 30) : nextY;
+    f.angle = Math.atan2(target.y - f.y, target.x - f.x);
+    f.ultInvincibilityTimer = Math.max(f.ultInvincibilityTimer || 0, 0.25);
+
+    if (effectSystem) {
+      effectSystem.addTrail(oldX, oldY, '#FFFDE7', 9);
+      effectSystem.addTrail(f.x, f.y, '#FFD700', 10);
+      for (let i = 0; i < 8; i++) {
+        effectSystem.addParticle({
+          x: oldX + (f.x - oldX) * (i / 7),
+          y: oldY + (f.y - oldY) * (i / 7),
+          vx: 0,
+          vy: 0,
+          life: 0.25,
+          maxLife: 0.25,
+          color: i % 2 === 0 ? '#FFFDE7' : '#FFD700',
+          size: 3,
+          gravity: 0,
+          friction: 1,
+          type: 'circle'
+        });
+      }
+      effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 16, '闪身', false, '#FFF176');
     }
   }
 }

@@ -1,6 +1,6 @@
 export const celestial_sword_deity = {
     id: 'celestial_sword_deity',
-    isHero: true,
+    isLegendary: true,
     name: 'Celestial Sword Deity',
     nameCN: '九霄剑仙',
     color: '#FFFDE7',             // Celestial light gold
@@ -24,12 +24,13 @@ export const celestial_sword_deity = {
     projectileType: null, // Custom basic attack handler spawns projectiles
 
     passives: [
-        { id: 'passive_sword_array', name: '万剑归宗', description: '普攻或受击凝聚一柄飞剑（上限9）。每柄飞剑提升4%攻速与移速。普攻时将飞剑倾泻射向敌人。' },
+        { id: 'passive_sword_array', name: '万剑归宗', description: '普通攻击打出两段攻击：原本剑波照常释放，随后眩晕大范围目标区域内敌人并连续冲刺穿刺 10 次，每次造成 4 点伤害；这段穿刺不会积攒飞剑。目标距离较近时，九霄剑仙会先闪身到敌人正前方发动普攻。普攻或受击仍会凝聚一柄飞剑（上限9）。每柄飞剑提升4%攻速与移速。' },
         { id: 'passive_invulnerable_dash', name: '人剑合一', description: '濒死时清除异常，化为金色剑意向后滑行并免死，对沿途敌人造成30点真实伤害（冷却30秒）。' }
     ],
 
     specialEffects: [
         { name: '太极八卦轮', description: '身后旋转的八卦金盘，展示仙人道行。' },
+        { name: '穿透无敌', description: '普通攻击闪身和万剑穿刺期间，九霄剑仙会短暂处于无敌状态。' },
         { name: '剑意护体', description: '飞剑环绕产生强烈的攻速与移动增幅。' },
         { name: '轩辕天罚', description: '诛仙剑阵末尾召唤灭世轩辕巨剑劈斩。' }
     ],

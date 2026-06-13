@@ -362,6 +362,16 @@ export class Fighter {
     this.ultInvincibilityTimer = Math.max(0, (this.ultInvincibilityTimer || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 
+    if (AttackHandler.updateCelestialBasicSwordBarrage(this, dt, effectSystem)) {
+      this.x = clamp(this.x, arenaX + 30, arenaX + arenaWidth - 30);
+      this.y = clamp(this.y, arenaY + 30, arenaY + arenaHeight - 30);
+      if (!isFinite(this.x)) this.x = arenaX + arenaWidth / 2;
+      if (!isFinite(this.y)) this.y = arenaY + arenaHeight / 2;
+      this.hp = safeFinite(this.hp, this.maxHp);
+      this.angle = normaliseAngle(this.angle);
+      return;
+    }
+
     // Bleed tick logic
     if (this.bleedTimer > 0 && this.alive && this.state !== 'dead') {
       this.bleedTick = (this.bleedTick || 0) - dt;
@@ -456,7 +466,11 @@ export class Fighter {
           }
         }
 
-        if (dist <= this.charData.attackRange && this.attackTimer <= 0) {
+        const basicAttackRange = this.charData.id === 'celestial_sword_deity'
+          ? Math.max(this.charData.attackRange, 240)
+          : this.charData.attackRange;
+
+        if (dist <= basicAttackRange && this.attackTimer <= 0) {
           // Hold normal attack if skill is ready but out of range, so we can walk closer!
           var holdAttackForSkill = this.skillReady && this.charData.skill && dist > this.charData.skill.range;
           
