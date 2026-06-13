@@ -1,4 +1,5 @@
 import * as Passives from './skills/Passives.js';
+import * as EffectLib from './effects_lib/index.js';
 import { FighterAI } from './ai/FighterAI.js';
 import { characterData } from './characters/index.js';
 import { safeFinite, safeDirection, clamp, normaliseAngle } from './utils.js';
@@ -133,6 +134,22 @@ export class Fighter {
     this.channelTimer = 0;
     this.channelTick = 0;
 
+    // Tidebringer mechanics
+    this.tideShield = this.hasPassive('tide_shield') ? this.charData.hp * 0.15 : 0;
+    this.tideShieldTimer = 7.0;
+    this.abyssalWeightStacks = 0;
+    this.abyssalWeightTimer = 0;
+    this.freezeTimer = 0;
+
+    // Time Traveler mechanics
+    this.temporalDilationTimer = 0;
+    this.chronoshiftUsed = false;
+    this.chronoshiftTimer = 0;
+    this.chronoshiftInvulnTimer = 0;
+    this.stateHistory = [];
+    this.inTemporalField = false;
+    this.temporalFieldTeam = null;
+
     // Reference to enemy target (set externally)
     this.target = null;
     this.ai = new FighterAI(this);
@@ -200,6 +217,59 @@ export class Fighter {
     // Dead fighters don't update beyond death animation
     if (!this.alive && this.state !== 'dead') return;
 
+    // Scan for active temporal fields
+    this.inTemporalField = false;
+    this.temporalFieldTeam = null;
+    if (ctx && ctx.temporalFields) {
+      for (const field of ctx.temporalFields) {
+        const dx = this.x - field.x;
+        const dy = this.y - field.y;
+        if (dx * dx + dy * dy <= field.radius * field.radius) {
+          this.inTemporalField = true;
+          this.temporalFieldTeam = field.ownerTeam;
+          break;
+        }
+      }
+    }
+
+    // Tick custom state timers
+    this.freezeTimer = Math.max(0, (this.freezeTimer || 0) - dt);
+    this.temporalDilationTimer = Math.max(0, (this.temporalDilationTimer || 0) - dt);
+    this.chronoshiftInvulnTimer = Math.max(0, (this.chronoshiftInvulnTimer || 0) - dt);
+
+    // Chronoshift rewind tick sequence
+    if (this.chronoshiftTimer > 0) {
+      this.chronoshiftTimer -= dt;
+      if (this.chronoshiftTimer <= 0) {
+        const rewindState = this.stateHistory && this.stateHistory.length > 0
+          ? this.stateHistory[0]
+          : { x: this.x, y: this.y, hp: this.maxHp * 0.3 };
+
+        this.x = rewindState.x;
+        this.y = rewindState.y;
+        this.hp = Math.max(this.maxHp * 0.3, rewindState.hp);
+        this.stateHistory = []; // clear history
+        this.chronoshiftInvulnTimer = 1.5; // post-rewind grace period
+        effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '回溯完成!', false, '#E6C229');
+        EffectLib.addCloneEffect(effectSystem, this.x, this.y, '#E6C229', 50);
+      }
+    }
+
+    // Record state history (up to 3 seconds ago)
+    if (this.alive && this.state !== 'dead' && !(this.chronoshiftTimer > 0)) {
+      if (!this.stateHistory) this.stateHistory = [];
+      this.stateHistory.push({
+        x: this.x,
+        y: this.y,
+        hp: this.hp,
+        time: Date.now()
+      });
+      const threeSecsAgo = Date.now() - 3000;
+      while (this.stateHistory.length > 0 && this.stateHistory[0].time < threeSecsAgo) {
+        this.stateHistory.shift();
+      }
+    }
+
     // Find closest target dynamically
     this.ai.findClosestTarget(opposingTeam);
 
@@ -207,7 +277,11 @@ export class Fighter {
     this.stateTimer += dt;
     var attackTimerRate = this.getAttackTimerRate();
     this.attackTimer = Math.max(0, this.attackTimer - dt * attackTimerRate);
-    this.skillCooldown = Math.max(0, this.skillCooldown - dt);
+
+    // Skill cooldown using modified recovery rate
+    var skillCooldownRate = this.getSkillCooldownRate();
+    this.skillCooldown = Math.max(0, this.skillCooldown - dt * skillCooldownRate);
+
     this.buffs.update(dt, effectSystem);
     this.hitFlashTimer = Math.max(0, this.hitFlashTimer - dt);
     this.blinkCooldown = Math.max(0, this.blinkCooldown - dt);
@@ -703,13 +777,41 @@ export class Fighter {
     return !!(this.charData.passives && this.charData.passives.some(passive => passive.id === passiveId));
   }
 
-  /**
-   * Passive-specific cooldowns and timers.
-   * @param {number} dt
-   */
   updatePassiveTimers(dt) {
     if (this.bloodShieldCooldown > 0) this.bloodShieldCooldown = Math.max(0, this.bloodShieldCooldown - dt);
     if (this.whistleCooldown > 0) this.whistleCooldown = Math.max(0, this.whistleCooldown - dt);
+
+    // Tidebringer tide shield timer
+    if (this.hasPassive('tide_shield')) {
+      if (this.tideShield <= 0) {
+        this.tideShieldTimer = (this.tideShieldTimer || 0) - dt;
+        if (this.tideShieldTimer <= 0) {
+          this.tideShield = this.maxHp * 0.15;
+          this.tideShieldTimer = 7.0;
+          if (this.battleContext && this.battleContext.effectSystem) {
+            this.battleContext.effectSystem.addDamageNumber(this.x, this.y - this.charData.size, '+潮汐壁垒!', false, '#80DEEA');
+            this.battleContext.effectSystem.addParticle({
+              x: this.x,
+              y: this.y,
+              vx: 0, vy: 0,
+              life: 0.4, maxLife: 0.4,
+              color: '#80DEEA',
+              size: this.charData.size * 1.5,
+              gravity: 0, friction: 1,
+              type: 'ring'
+            });
+          }
+        }
+      }
+    }
+
+    // Abyssal weight stacks decay
+    if (this.abyssalWeightTimer > 0) {
+      this.abyssalWeightTimer -= dt;
+      if (this.abyssalWeightTimer <= 0) {
+        this.abyssalWeightStacks = 0;
+      }
+    }
   }
 
   /**
@@ -869,6 +971,15 @@ export class Fighter {
     if (this.counterStanceTimer > 0) {
       rate *= 1.6;
     }
+    // Abyssal weight: -20% attack speed per stack
+    if (this.abyssalWeightStacks > 0) {
+      rate *= (1 - this.abyssalWeightStacks * 0.20);
+    }
+    // Temporal Field: friendly +40%, enemy -50%
+    if (this.inTemporalField) {
+      const isAlly = this.temporalFieldTeam === this.team;
+      rate *= isAlly ? 1.4 : 0.5;
+    }
     return rate;
   }
 
@@ -890,6 +1001,15 @@ export class Fighter {
     if (this.dawnSpeedTimer > 0) {
       mult *= 1.25;
     }
+    // Abyssal weight: -20% move speed per stack
+    if (this.abyssalWeightStacks > 0) {
+      mult *= (1 - this.abyssalWeightStacks * 0.20);
+    }
+    // Temporal Field: friendly +40%, enemy -50%
+    if (this.inTemporalField) {
+      const isAlly = this.temporalFieldTeam === this.team;
+      mult *= isAlly ? 1.4 : 0.5;
+    }
     return mult;
   }
 
@@ -907,7 +1027,46 @@ export class Fighter {
     if (this.counterStanceTimer > 0) {
       mult *= 1.35;
     }
+    // Oceanic Unity: +8% damage per friendly summon
+    const SUMMON_IDS = ['tide_summon', 'xiaotian_hound', 'summoned_golem', 'shadow_clone'];
+    const isTidebringer = this.hasPassive('oceanic_unity');
+    const isSummon = SUMMON_IDS.includes(this.charData.id);
+    if (isTidebringer || isSummon) {
+      let tidebringerAlive = isTidebringer && this.isAlive();
+      let summonCount = 0;
+      if (this.battleContext && this.battleContext.ownTeam) {
+        this.battleContext.ownTeam.forEach(f => {
+          if (f.isAlive()) {
+            if (f.hasPassive('oceanic_unity')) {
+              tidebringerAlive = true;
+            }
+            if (SUMMON_IDS.includes(f.charData.id)) {
+              summonCount++;
+            }
+          }
+        });
+      }
+      if (tidebringerAlive && summonCount > 0) {
+        mult *= (1 + summonCount * 0.08);
+      }
+    }
     return mult;
+  }
+
+  /**
+   * Get skill cooldown rate multiplier.
+   * @returns {number}
+   */
+  getSkillCooldownRate() {
+    let rate = 1.0;
+    if (this.temporalDilationTimer > 0) {
+      rate *= 0.5;
+    }
+    if (this.inTemporalField) {
+      const isAlly = this.temporalFieldTeam === this.team;
+      rate *= isAlly ? 1.5 : 0.5;
+    }
+    return rate;
   }
 
   /**

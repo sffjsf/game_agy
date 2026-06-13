@@ -56,6 +56,10 @@ export class CombatManager {
     return this.hazardZoneManager.burnZones;
   }
 
+  get temporalFields() {
+    return this.hazardZoneManager.temporalFields;
+  }
+
   _computeArena() {
     const pad = 20;
     this.arenaWidth = this.canvas.width - pad * 2;
@@ -272,6 +276,10 @@ export class CombatManager {
 
   updateBurnZones(dt) {
     this.hazardZoneManager.updateBurnZones(dt, this._getHazardBattleState());
+  }
+
+  addTemporalField(...args) {
+    this.hazardZoneManager.addTemporalField(...args);
   }
 
   resolveFighterCollision() {

@@ -28,6 +28,8 @@ import { executeMorningStarJudgment } from './abilities/MorningStarJudgment.js';
 import { executeChainLightning } from './abilities/ChainLightning.js';
 import { executeCorrosiveCloud } from './abilities/CorrosiveCloud.js';
 import { executeShadowbladeStorm } from './abilities/ShadowbladeStorm.js';
+import { executeAbyssalTorrent } from './abilities/AbyssalTorrent.js';
+import { executeTemporalField } from './abilities/TemporalField.js';
 import { safeFinite } from '../utils.js';
 
 /**
@@ -68,6 +70,8 @@ const skillExecutors = {
   chain_lightning:    executeChainLightning,
   corrosive_cloud:    executeCorrosiveCloud,
   shadowblade_storm:  executeShadowbladeStorm,
+  abyssal_torrent:    executeAbyssalTorrent,
+  temporal_field:     executeTemporalField,
 };
 
 /**

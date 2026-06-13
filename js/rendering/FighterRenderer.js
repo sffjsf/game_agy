@@ -71,6 +71,95 @@ export class FighterRenderer {
       ctx.restore();
     }
 
+    // Render Tide Shield Bubble
+    if (f.tideShield > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(128, 222, 234, 0.8)';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#80DEEA';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.charData.size * 1.35 + Math.sin(time * 6) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Draw small bubbles on the water shield
+      ctx.fillStyle = '#FFFFFF';
+      ctx.globalAlpha = 0.5;
+      for (let i = 0; i < 4; i++) {
+        const bubbleAngle = time * 2.2 + i * (Math.PI / 2);
+        const bx = f.x + Math.cos(bubbleAngle) * (f.charData.size * 1.35);
+        const by = f.y + Math.sin(bubbleAngle) * (f.charData.size * 1.35);
+        ctx.beginPath();
+        ctx.arc(bx, by, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Render Frozen Ice Block
+    if (f.freezeTimer > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.55 + Math.sin(time * 10) * 0.1;
+      ctx.fillStyle = 'rgba(128, 222, 234, 0.4)';
+      ctx.strokeStyle = '#80DEEA';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#00E5FF';
+      ctx.shadowBlur = 10;
+      
+      const size = f.charData.size * 1.35;
+      ctx.beginPath();
+      ctx.roundRect(f.x - size, f.y - size, size * 2, size * 2, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(f.x - size * 0.7, f.y - size * 0.7);
+      ctx.lineTo(f.x - size * 0.2, f.y - size * 0.8);
+      ctx.moveTo(f.x + size * 0.6, f.y + size * 0.5);
+      ctx.lineTo(f.x + size * 0.3, f.y + size * 0.8);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Render Chronoshift Backwards Clock
+    if (f.chronoshiftTimer > 0) {
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      
+      ctx.strokeStyle = 'rgba(230, 194, 41, 0.85)';
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#E6C229';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(0, 0, f.charData.size * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(230, 194, 41, 0.6)';
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 4; i++) {
+        const angle = (i * Math.PI) / 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * (f.charData.size * 1.3), Math.sin(angle) * (f.charData.size * 1.3));
+        ctx.lineTo(Math.cos(angle) * (f.charData.size * 1.5), Math.sin(angle) * (f.charData.size * 1.5));
+        ctx.stroke();
+      }
+
+      const backRotation = -time * 10;
+      ctx.strokeStyle = '#E6C229';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(backRotation) * (f.charData.size * 1.0), Math.sin(backRotation) * (f.charData.size * 1.0));
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(backRotation * 1.7) * (f.charData.size * 1.3), Math.sin(backRotation * 1.7) * (f.charData.size * 1.3));
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
     // ── Hit flash (white overlay) ──
     if (f.hitFlashTimer > 0) {
       ctx.save();

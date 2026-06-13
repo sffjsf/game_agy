@@ -15,9 +15,9 @@ export class FighterHealth {
     attackerX = safeFinite(attackerX, f.x);
     attackerY = safeFinite(attackerY, f.y);
 
-    // Ult Invincibility check
-    if (f.ultInvincibilityTimer > 0) {
-      effectSystem.addDamageNumber(f.x, f.y - f.charData.size, '免伤!', false, '#9C27B0');
+    // Ult Invincibility or Chronoshift invulnerability check
+    if (f.ultInvincibilityTimer > 0 || (f.chronoshiftInvulnTimer && f.chronoshiftInvulnTimer > 0) || (f.chronoshiftTimer && f.chronoshiftTimer > 0)) {
+      effectSystem.addDamageNumber(f.x, f.y - f.charData.size, '免伤!', false, '#E6C229');
       return;
     }
 
@@ -108,6 +108,29 @@ export class FighterHealth {
 
     // State transition
     if (f.hp <= 0) {
+      // ── Chronoshift Save Check ──
+      let timeTraveler = null;
+      const ownTeam = f.battleContext && f.battleContext.ownTeam ? f.battleContext.ownTeam : [];
+      for (const teammate of ownTeam) {
+        if (teammate.isAlive() && (teammate === f || teammate.hp > 0) && teammate.hasPassive('chronoshift') && !teammate.chronoshiftUsed) {
+          timeTraveler = teammate;
+          break;
+        }
+      }
+
+      if (timeTraveler) {
+        timeTraveler.chronoshiftUsed = true;
+        f.hp = 1;
+        f.chronoshiftTimer = 1.0;
+        f.chronoshiftInvulnTimer = 1.0;
+        f.applyStun(1.0);
+        effectSystem.addDamageNumber(f.x, f.y - f.charData.size, '时空回溯!', false, '#E6C229');
+        EffectLib.addCloneEffect(effectSystem, f.x, f.y, '#E6C229', 45);
+        if (soundSystem) soundSystem.playSkillSound();
+        f.setState('hit');
+        return;
+      }
+
       if (FighterHealth.tryLethalSurvivalPassives(f, effectSystem)) {
         f.setState('chase');
       } else {

@@ -6,12 +6,14 @@ export class HazardZoneManager {
     this.poisonZones = [];
     this.gravityWells = [];
     this.burnZones = [];
+    this.temporalFields = [];
   }
 
   clear() {
     this.poisonZones = [];
     this.gravityWells = [];
     this.burnZones = [];
+    this.temporalFields = [];
   }
 
   addPoisonZone(x, y, ownerTeam, radius, duration, poisonDps, slowDuration) {
@@ -51,10 +53,22 @@ export class HazardZoneManager {
     });
   }
 
+  addTemporalField(x, y, ownerTeam, radius, duration) {
+    this.temporalFields.push({
+      x: safeFinite(x, 400),
+      y: safeFinite(y, 300),
+      ownerTeam: ownerTeam,
+      radius: radius || 150,
+      duration: duration || 3.5,
+      maxDuration: duration || 3.5
+    });
+  }
+
   update(dt, battle) {
     this.updatePoisonZones(dt, battle);
     this.updateGravityWells(dt, battle);
     this.updateBurnZones(dt, battle);
+    this.updateTemporalFields(dt, battle);
   }
 
   updatePoisonZones(dt, battle) {
@@ -220,6 +234,40 @@ export class HazardZoneManager {
           enemy.applyBurn(1.0, zone.burnDps);
         }
       });
+    }
+  }
+
+  updateTemporalFields(dt, battle) {
+    const effectSystem = battle.effectSystem;
+    for (let i = this.temporalFields.length - 1; i >= 0; i--) {
+      const field = this.temporalFields[i];
+      field.duration -= dt;
+
+      // Spawn golden/orange particles in the temporal field
+      if (Math.random() < 0.25) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * field.radius;
+        const px = field.x + Math.cos(angle) * dist;
+        const py = field.y + Math.sin(angle) * dist;
+        effectSystem.addParticle({
+          x: px,
+          y: py,
+          vx: (Math.random() - 0.5) * 15,
+          vy: (Math.random() - 0.5) * 15,
+          life: 0.3 + Math.random() * 0.3,
+          maxLife: 0.6,
+          color: Math.random() < 0.5 ? '#E6C229' : '#F17105',
+          size: 1.5 + Math.random() * 2,
+          gravity: 0,
+          friction: 0.95,
+          type: 'spark'
+        });
+      }
+
+      if (field.duration <= 0) {
+        this.temporalFields.splice(i, 1);
+        continue;
+      }
     }
   }
 }

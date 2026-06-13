@@ -39,6 +39,9 @@ import { thunder_scholar } from './ThunderScholar.js';
 import { alchemist } from './Alchemist.js';
 import { blade_master } from './BladeMaster.js';
 import { shadow_clone } from './ShadowClone.js';
+import { tidebringer } from './Tidebringer.js';
+import { tide_summon } from './TideSummon.js';
+import { time_traveler } from './TimeTraveler.js';
 
 /**
  * Required fields every character data object must have.
@@ -164,7 +167,10 @@ export const characterData = {
   thunder_scholar,
   alchemist,
   blade_master,
-  shadow_clone
+  shadow_clone,
+  tidebringer,
+  tide_summon,
+  time_traveler
 };
 
 // ── Validate all characters on import (dev-only safety net) ──

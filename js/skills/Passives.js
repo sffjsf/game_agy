@@ -5,6 +5,16 @@ import { createProjectile } from '../combat/Projectile.js';
 import { executeHavocInHeaven } from './abilities/HavocInHeaven.js';
 
 export function applyMeleeHitPassives(fighter, damage, primaryTarget, effectSystem) {
+  if (fighter.hasPassive('abyssal_weight')) {
+    primaryTarget.abyssalWeightStacks = Math.min((primaryTarget.abyssalWeightStacks || 0) + 1, 2);
+    primaryTarget.abyssalWeightTimer = 5.0;
+    effectSystem.addDamageNumber(primaryTarget.x, primaryTarget.y - primaryTarget.charData.size, `深渊重压 x${primaryTarget.abyssalWeightStacks}`, false, '#80DEEA');
+  }
+  if (fighter.hasPassive('temporal_dilation')) {
+    primaryTarget.temporalDilationTimer = 3.0;
+    effectSystem.addDamageNumber(primaryTarget.x, primaryTarget.y - primaryTarget.charData.size, '时间膨胀!', false, '#E6C229');
+  }
+
   if (fighter.hasPassive('saitama_splash')) {
     EffectLib.addMeteorEffect(effectSystem, primaryTarget.x, primaryTarget.y, '#FFD700', 70);
     effectSystem.screenShake(5);
@@ -239,6 +249,48 @@ export function applyDamageReductionPassives(fighter, damage, effectSystem, atta
       effectSystem.addHealEffect(fighter.x, fighter.y);
       effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '+磁能护盾!', false, '#FF6D00');
       EffectLib.addCloneEffect(effectSystem, fighter.x, fighter.y, '#FF6D00', 40);
+    }
+  }
+
+  if (fighter.hasPassive('tide_shield') && fighter.tideShield > 0) {
+    if (damage >= fighter.tideShield) {
+      damage -= fighter.tideShield;
+      fighter.tideShield = 0;
+      effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '潮汐壁垒破裂!', false, '#80DEEA');
+
+      const opposingTeam = fighter.battleContext && fighter.battleContext.opposingTeam
+        ? fighter.battleContext.opposingTeam
+        : [];
+      opposingTeam.forEach(enemy => {
+        if (enemy.isAlive()) {
+          const dx = enemy.x - fighter.x;
+          const dy = enemy.y - fighter.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist <= 120) {
+            enemy.applyStun(1.2);
+            enemy.freezeTimer = 1.2;
+            for (let i = 0; i < 6; i++) {
+              effectSystem.addParticle({
+                x: enemy.x + (Math.random() - 0.5) * 15,
+                y: enemy.y + (Math.random() - 0.5) * 15,
+                vx: (Math.random() - 0.5) * 30,
+                vy: (Math.random() - 0.5) * 30,
+                life: 0.3 + Math.random() * 0.25,
+                maxLife: 0.55,
+                color: '#80DEEA',
+                size: 2.0 + Math.random() * 2.5,
+                gravity: 0,
+                friction: 0.94,
+                type: 'circle'
+              });
+            }
+          }
+        }
+      });
+    } else {
+      fighter.tideShield -= damage;
+      effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, `壁垒吸收 ${Math.floor(damage)}`, false, '#80DEEA');
+      damage = 0;
     }
   }
 

@@ -8,11 +8,13 @@ export function createBattleContexts(combatManager) {
     arenaHeight: combatManager.arenaHeight,
     arenaX: combatManager.arenaX,
     arenaY: combatManager.arenaY,
+    temporalFields: combatManager.temporalFields,
     battleCallbacks: {
       addPoisonZone: (...args) => combatManager.addPoisonZone(...args),
       applyAreaDamage: (x, y, ownerTeam, damage, radius, attacker) => combatManager.applyAreaDamage(x, y, ownerTeam, damage, radius, attacker),
       addGravityWell: (...args) => combatManager.addGravityWell(...args),
       addBurnZone: (...args) => combatManager.addBurnZone(...args),
+      addTemporalField: (...args) => combatManager.addTemporalField(...args),
     },
   };
 

@@ -16,6 +16,8 @@ const PROJECTILE_DEFAULTS = {
   poison:           { speed: 420, size: 7 },
   train:            { speed: 300, size: 24 },
   skill_projectile: { speed: 280, size: 8 },
+  water_orb:        { speed: 800, size: 8 },
+  time_bolt:        { speed: 950, size: 7 },
 };
 const DEFAULT_PROJECTILE = { speed: 350, size: 5 };
 

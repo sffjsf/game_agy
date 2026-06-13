@@ -25,6 +25,7 @@ export class CombatRenderer {
       const time = performance.now() / 1000;
       this.drawPoisonZones(ctx, state.hazards.poisonZones, time);
       this.drawBurnZones(ctx, state.hazards.burnZones, time);
+      this.drawTemporalFields(ctx, state.hazards.temporalFields, time);
 
       state.fightersLeft.forEach(f => f.render(ctx, time));
       state.fightersRight.forEach(f => f.render(ctx, time));
@@ -118,6 +119,91 @@ export class CombatRenderer {
       ctx.beginPath();
       ctx.arc(zone.x, zone.y, pulseRadius, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  drawTemporalFields(ctx, temporalFields, time) {
+    if (!temporalFields || temporalFields.length === 0) return;
+
+    temporalFields.forEach(zone => {
+      ctx.save();
+
+      // 1. Draw a golden glowing radial gradient base
+      const grad = ctx.createRadialGradient(zone.x, zone.y, 2, zone.x, zone.y, zone.radius);
+      grad.addColorStop(0, 'rgba(230, 194, 41, 0.22)');
+      grad.addColorStop(0.5, 'rgba(241, 113, 5, 0.12)');
+      grad.addColorStop(0.85, 'rgba(230, 194, 41, 0.05)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Draw the outer ticking dial border
+      ctx.strokeStyle = 'rgba(230, 194, 41, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 3. Draw tick marks around the border (clock dial)
+      ctx.strokeStyle = 'rgba(230, 194, 41, 0.5)';
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 12; i++) {
+        const angle = (i * Math.PI) / 6;
+        const startDist = zone.radius - 8;
+        const endDist = zone.radius;
+        ctx.beginPath();
+        ctx.moveTo(zone.x + Math.cos(angle) * startDist, zone.y + Math.sin(angle) * startDist);
+        ctx.lineTo(zone.x + Math.cos(angle) * endDist, zone.y + Math.sin(angle) * endDist);
+        ctx.stroke();
+      }
+
+      // 4. Draw rotating gear shape in the background
+      ctx.strokeStyle = 'rgba(241, 113, 5, 0.15)';
+      ctx.lineWidth = 2;
+      const gearRadius = zone.radius * 0.6;
+      const teethCount = 8;
+      const rotation = time * 0.4; // Rotate gear slowly
+      ctx.beginPath();
+      for (let i = 0; i < teethCount * 2; i++) {
+        const angle = rotation + (i * Math.PI) / teethCount;
+        const r = (i % 2 === 0) ? gearRadius + 10 : gearRadius - 5;
+        const px = zone.x + Math.cos(angle) * r;
+        const py = zone.y + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // 5. Draw ticking clock hands (Hour, Minute)
+      // Hour hand (slow rotation)
+      const hourAngle = time * 0.2;
+      ctx.strokeStyle = 'rgba(230, 194, 41, 0.7)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(zone.x, zone.y);
+      ctx.lineTo(zone.x + Math.cos(hourAngle) * (zone.radius * 0.4), zone.y + Math.sin(hourAngle) * (zone.radius * 0.4));
+      ctx.stroke();
+
+      // Minute hand (faster rotation)
+      const minuteAngle = time * 1.5;
+      ctx.strokeStyle = 'rgba(230, 194, 41, 0.8)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(zone.x, zone.y);
+      ctx.lineTo(zone.x + Math.cos(minuteAngle) * (zone.radius * 0.75), zone.y + Math.sin(minuteAngle) * (zone.radius * 0.75));
+      ctx.stroke();
+
+      // Clock center pivot
+      ctx.fillStyle = '#E6C229';
+      ctx.beginPath();
+      ctx.arc(zone.x, zone.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.restore();
     });
   }
