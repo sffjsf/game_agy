@@ -117,6 +117,10 @@ export class Fighter {
     // Rogue mechanics
     this.smokeDodgeTimer = 0;
 
+    // Dawn Goddess mechanics
+    this.dawnSpeedTimer = 0;
+    this.finalSunriseUsed = false;
+
     // Channeling skill state (e.g. Berserker whirlwind)
     this.channelTimer = 0;
     this.channelTick = 0;
@@ -207,6 +211,7 @@ export class Fighter {
     this.windFuryTimer = Math.max(0, (this.windFuryTimer || 0) - dt);
     this.counterStanceTimer = Math.max(0, (this.counterStanceTimer || 0) - dt);
     this.smokeDodgeTimer = Math.max(0, (this.smokeDodgeTimer || 0) - dt);
+    this.dawnSpeedTimer = Math.max(0, (this.dawnSpeedTimer || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 
     this.updatePassiveTimers(dt);
@@ -834,6 +839,10 @@ export class Fighter {
     // Wind fury: +40% move speed
     if (this.windFuryTimer > 0) {
       mult *= 1.4;
+    }
+    // Dawn blessing: brief allied movement speed boost
+    if (this.dawnSpeedTimer > 0) {
+      mult *= 1.25;
     }
     return mult;
   }

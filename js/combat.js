@@ -2,6 +2,7 @@ import { WeaponSystem } from './weapon.js';
 import { EffectSystem } from './effects.js';
 import { safeDirection } from './utils.js';
 import { createBattleContexts } from './combat/BattleContextFactory.js';
+import * as Passives from './skills/Passives.js';
 import { CombatRenderer } from './combat/CombatRenderer.js';
 import { HazardZoneManager } from './combat/HazardZoneManager.js';
 import { ProjectileHitProcessor } from './combat/ProjectileHitProcessor.js';
@@ -168,8 +169,17 @@ export class CombatManager {
         if (attacker && attacker.getOutgoingDamageMultiplier) {
           hit.damage *= attacker.getOutgoingDamageMultiplier();
         }
+        if (attacker) {
+          hit.damage = Passives.applyDawnDebuffBonus(attacker, hit.target, hit.damage, this.effectSystem);
+        }
 
         hit.target.takeDamage(hit.damage, hitX, hitY, this.effectSystem);
+        if (attacker) {
+          Passives.triggerDawnBlessing(attacker, this.effectSystem);
+          if (hit.target.hp <= 0 || hit.target.state === 'dead') {
+            Passives.triggerDawnKillRevive(attacker, this.effectSystem);
+          }
+        }
 
         // Bounty mark: on-kill permanent attack speed boost (max 25 stacks)
         if (!hit.target.isAlive() && attacker && attacker.hasPassive('bounty_mark')) {

@@ -303,6 +303,92 @@ export function tryLethalSurvivalPassives(fighter, effectSystem) {
   return false;
 }
 
+export function hasNegativeBuff(target) {
+  if (!target || !target.buffs) return false;
+  return target.buffs.isStunned() || target.buffs.isSlowed() || target.buffs.isPoisoned() || target.buffs.isBurning();
+}
+
+export function applyDawnDebuffBonus(attacker, target, damage, effectSystem) {
+  if (!attacker || !attacker.hasPassive || !attacker.hasPassive('purifying_light')) return damage;
+  if (!hasNegativeBuff(target)) return damage;
+  effectSystem.addDamageNumber(target.x, target.y - target.charData.size - 18, '净化!', false, '#FFF176');
+  return damage * 4.0;
+}
+
+export function triggerDawnBlessing(fighter, effectSystem) {
+  if (!fighter || !fighter.hasPassive || !fighter.hasPassive('dawn_blessing')) return;
+  const ownTeam = fighter.battleContext ? fighter.battleContext.ownTeam : null;
+  if (!ownTeam) return;
+
+  const radius = 220;
+  ownTeam.forEach(ally => {
+    if (!ally.isAlive()) return;
+    const dx = ally.x - fighter.x;
+    const dy = ally.y - fighter.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= radius) {
+      ally.heal(10, effectSystem);
+      ally.dawnSpeedTimer = 2.0;
+    }
+  });
+  effectSystem.addHealEffect(fighter.x, fighter.y);
+  effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '曙光祝福!', false, '#FFF176');
+}
+
+export function reviveRandomAlly(fighter, effectSystem, includeSelf) {
+  if (!fighter || !fighter.battleContext || !fighter.battleContext.ownTeam) return false;
+  const ownTeam = fighter.battleContext.ownTeam;
+  const candidates = ownTeam.filter(ally => {
+    const selfDying = includeSelf && ally === fighter && ally.hp <= 0;
+    if (ally.isAlive() && !selfDying) return false;
+    if (!includeSelf && ally === fighter) return false;
+    if (ally !== fighter && ally.charData && ally.charData.hidden) return false;
+    return true;
+  });
+  if (candidates.length === 0) return false;
+
+  const revived = candidates[Math.floor(Math.random() * candidates.length)];
+  revived.alive = true;
+  revived.hp = Math.max(1, Math.floor(revived.maxHp * 0.45));
+  revived.setState('chase');
+  revived.buffs.clearDebuffs();
+  revived.buffs.clearBurn();
+  revived.buffs.poison = 0;
+  revived.buffs.poisonDps = 0;
+  revived.buffs.poisonTick = 0;
+  revived.hitFlashTimer = 0;
+  effectSystem.addHealEffect(revived.x, revived.y);
+  effectSystem.addDamageNumber(revived.x, revived.y - revived.charData.size - 18, '复活!', false, '#FFF176');
+  EffectLib.addCloneEffect(effectSystem, revived.x, revived.y, '#FFF176', 55);
+  return revived;
+}
+
+export function triggerDawnKillRevive(fighter, effectSystem) {
+  if (!fighter || !fighter.hasPassive || !fighter.hasPassive('dawn_resurrection')) return null;
+  const revived = reviveRandomAlly(fighter, effectSystem, false);
+  if (revived) {
+    effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 24, '黎明复苏!', false, '#FFF176');
+    return revived;
+  }
+
+  // No valid fallen non-summoned ally: convert the resurrection into self-healing.
+  fighter.heal(20, effectSystem);
+  effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 24, '+20 曙光!', false, '#FFF176');
+  return null;
+}
+
+export function triggerFinalSunrise(fighter, effectSystem) {
+  if (!fighter || !fighter.hasPassive || !fighter.hasPassive('final_sunrise')) return null;
+  if (fighter.finalSunriseUsed) return null;
+  fighter.finalSunriseUsed = true;
+  const revived = reviveRandomAlly(fighter, effectSystem, true);
+  if (revived) {
+    effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size - 24, '终末曙光!', false, '#FFF176');
+    effectSystem.screenShake(8);
+  }
+  return revived;
+}
+
 export function trySentryDrones(fighter, opposingTeam, effectSystem, dt) {
   if (!opposingTeam || fighter.isStunned()) return;
 

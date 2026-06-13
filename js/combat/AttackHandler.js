@@ -1,4 +1,5 @@
 import * as EffectLib from '../effects_lib/index.js';
+import * as Passives from '../skills/Passives.js';
 import { executeSkillStrategy } from '../skills/SkillRegistry.js';
 import { soundSystem } from '../audio.js';
 import { getArenaBoundaryIntersection } from '../skills/abilities/BlazingStampede.js';
@@ -89,10 +90,15 @@ export class AttackHandler {
 
         // Apply outgoing damage multiplier (e.g. wind fury)
         finalDamage *= f.getOutgoingDamageMultiplier();
+        finalDamage = Passives.applyDawnDebuffBonus(f, f.target, finalDamage, effectSystem);
 
         f.applyMeleeHitPassives(finalDamage, f.target, effectSystem);
         f.target.takeDamage(finalDamage, f.x, f.y, effectSystem);
         f.healFromDamage(finalDamage, effectSystem);
+        Passives.triggerDawnBlessing(f, effectSystem);
+        if (f.target.hp <= 0 || f.target.state === 'dead') {
+          Passives.triggerDawnKillRevive(f, effectSystem);
+        }
 
         // Counter stance: consume the empowered strike after landing it
         if (f.counterStanceTimer > 0) {

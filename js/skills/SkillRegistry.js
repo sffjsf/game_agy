@@ -24,6 +24,7 @@ import { executeBlazingStampede } from './abilities/BlazingStampede.js';
 import { executeGaleDash } from './abilities/GaleDash.js';
 import { executeChainPull } from './abilities/ChainPull.js';
 import { executeSmokeBomb } from './abilities/SmokeBomb.js';
+import { executeMorningStarJudgment } from './abilities/MorningStarJudgment.js';
 import { safeFinite } from '../utils.js';
 
 /**
@@ -60,6 +61,7 @@ const skillExecutors = {
   gale_dash:          executeGaleDash,
   chain_pull:         executeChainPull,
   smoke_bomb:         executeSmokeBomb,
+  morning_star_judgment: executeMorningStarJudgment,
 };
 
 /**

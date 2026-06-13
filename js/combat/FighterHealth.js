@@ -63,8 +63,13 @@ export class FighterHealth {
       if (FighterHealth.tryLethalSurvivalPassives(f, effectSystem)) {
         f.setState('chase');
       } else {
-        if (soundSystem) soundSystem.playDeathSound();
-        f.setState('dead');
+        const revived = Passives.triggerFinalSunrise(f, effectSystem);
+        if (revived === f) {
+          f.setState('chase');
+        } else {
+          if (soundSystem) soundSystem.playDeathSound();
+          f.setState('dead');
+        }
       }
     } else if (f.state !== 'attack' && f.state !== 'skill' && f.state !== 'reposition' && f.state !== 'dashing_skill' && f.state !== 'channeling' && f.state !== 'dead') {
       f.setState('hit');

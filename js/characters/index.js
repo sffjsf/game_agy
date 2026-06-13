@@ -30,6 +30,7 @@ import { ronin } from './Ronin.js';
 import { chain_fighter } from './ChainFighter.js';
 import { brawler } from './Brawler.js';
 import { rogue } from './Rogue.js';
+import { dawn_goddess } from './DawnGoddess.js';
 
 /**
  * Required fields every character data object must have.
@@ -146,7 +147,8 @@ export const characterData = {
   ronin,
   chain_fighter,
   brawler,
-  rogue
+  rogue,
+  dawn_goddess
 };
 
 // ── Validate all characters on import (dev-only safety net) ──
