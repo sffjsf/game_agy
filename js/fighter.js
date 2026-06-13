@@ -150,6 +150,14 @@ export class Fighter {
     this.inTemporalField = false;
     this.temporalFieldTeam = null;
 
+    // Celestial Sword Deity mechanics
+    this.swordCount = 0;
+    this.invulnerableDashCooldown = 0;
+    this.invulnerableDashTimer = 0;
+    this.celestialSwordsTimer = 0;
+    this.isAscended = false;
+    this.inSwordArray = false;
+
     // Reference to enemy target (set externally)
     this.target = null;
     this.ai = new FighterAI(this);
@@ -232,10 +240,63 @@ export class Fighter {
       }
     }
 
+    // Check if in Yin-Yang Sword Array
+    this.inSwordArray = false;
+    if (ctx && ctx.swordArrays) {
+      for (const array of ctx.swordArrays) {
+        const dx = this.x - array.x;
+        const dy = this.y - array.y;
+        if (dx * dx + dy * dy <= array.radius * array.radius && array.ownerTeam !== this.team) {
+          this.inSwordArray = true;
+        }
+      }
+    }
+
     // Tick custom state timers
     this.freezeTimer = Math.max(0, (this.freezeTimer || 0) - dt);
     this.temporalDilationTimer = Math.max(0, (this.temporalDilationTimer || 0) - dt);
     this.chronoshiftInvulnTimer = Math.max(0, (this.chronoshiftInvulnTimer || 0) - dt);
+    this.invulnerableDashCooldown = Math.max(0, (this.invulnerableDashCooldown || 0) - dt);
+    this.celestialSwordsTimer = Math.max(0, (this.celestialSwordsTimer || 0) - dt);
+    if (this.celestialSwordsTimer <= 0) {
+      this.isAscended = false;
+    }
+
+    // Slide/Dash movement for Sword Deity survival dash
+    if (this.invulnerableDashTimer > 0) {
+      this.invulnerableDashTimer -= dt;
+      this.x += this.invulnerableDashVx * dt;
+      this.y += this.invulnerableDashVy * dt;
+
+      // Clamp coordinates
+      const arenaX = this.battleContext ? this.battleContext.arenaX : 50;
+      const arenaY = this.battleContext ? this.battleContext.arenaY : 50;
+      const arenaWidth = this.battleContext ? this.battleContext.arenaWidth : 700;
+      const arenaHeight = this.battleContext ? this.battleContext.arenaHeight : 500;
+      this.x = clamp(this.x, arenaX + 30, arenaX + arenaWidth - 30);
+      this.y = clamp(this.y, arenaY + 30, arenaY + arenaHeight - 30);
+
+      if (effectSystem) {
+        effectSystem.addTrail(this.x, this.y, '#E6C229', 12);
+        if (Math.random() < 0.6) {
+          effectSystem.addParticle({
+            x: this.x,
+            y: this.y,
+            vx: (Math.random() - 0.5) * 80,
+            vy: (Math.random() - 0.5) * 80,
+            life: 0.35,
+            maxLife: 0.35,
+            color: '#FFD700',
+            size: 2 + Math.random() * 2,
+            type: 'circle'
+          });
+        }
+      }
+
+      if (this.invulnerableDashTimer <= 0) {
+        this.setState('chase');
+      }
+    }
 
     // Chronoshift rewind tick sequence
     if (this.chronoshiftTimer > 0) {
@@ -980,6 +1041,10 @@ export class Fighter {
       const isAlly = this.temporalFieldTeam === this.team;
       rate *= isAlly ? 1.4 : 0.5;
     }
+    // Passive: +4% attack speed per flying sword
+    if (this.hasPassive('passive_sword_array') && this.swordCount > 0) {
+      rate *= (1 + this.swordCount * 0.04);
+    }
     return rate;
   }
 
@@ -988,6 +1053,9 @@ export class Fighter {
    * @returns {number}
    */
   getSpeedMultiplier() {
+    if (this.isAscended || this.celestialSwordsTimer > 0 || (this.invulnerableDashTimer && this.invulnerableDashTimer > 0)) {
+      return 0;
+    }
     let mult = this.isSlowed() ? 0.5 : 1.0;
     // Blood rage: +25% move speed when HP below 35%
     if (this.hasPassive('blood_rage') && this.hp < this.maxHp * 0.35) {
@@ -1009,6 +1077,14 @@ export class Fighter {
     if (this.inTemporalField) {
       const isAlly = this.temporalFieldTeam === this.team;
       mult *= isAlly ? 1.4 : 0.5;
+    }
+    // Passive: +4% move speed per flying sword
+    if (this.hasPassive('passive_sword_array') && this.swordCount > 0) {
+      mult *= (1 + this.swordCount * 0.04);
+    }
+    // Yin-Yang Sword Array: 90% slow (very slow)
+    if (this.inSwordArray) {
+      mult *= 0.1;
     }
     return mult;
   }

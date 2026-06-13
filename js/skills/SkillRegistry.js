@@ -30,6 +30,7 @@ import { executeCorrosiveCloud } from './abilities/CorrosiveCloud.js';
 import { executeShadowbladeStorm } from './abilities/ShadowbladeStorm.js';
 import { executeAbyssalTorrent } from './abilities/AbyssalTorrent.js';
 import { executeTemporalField } from './abilities/TemporalField.js';
+import { executeCelestialSwords } from './abilities/CelestialSwords.js';
 import { safeFinite } from '../utils.js';
 
 /**
@@ -72,6 +73,7 @@ const skillExecutors = {
   shadowblade_storm:  executeShadowbladeStorm,
   abyssal_torrent:    executeAbyssalTorrent,
   temporal_field:     executeTemporalField,
+  celestial_swords:   executeCelestialSwords,
 };
 
 /**

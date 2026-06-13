@@ -18,6 +18,8 @@ const PROJECTILE_DEFAULTS = {
   skill_projectile: { speed: 280, size: 8 },
   water_orb:        { speed: 800, size: 8 },
   time_bolt:        { speed: 950, size: 7 },
+  flying_sword:     { speed: 750, size: 5 },
+  sword_wave:       { speed: 700, size: 10 },
 };
 const DEFAULT_PROJECTILE = { speed: 350, size: 5 };
 
@@ -131,8 +133,8 @@ export class WeaponSystem {
         var combinedRadius = proj.size + fighter.charData.size;
 
         if (dist < combinedRadius) {
-          if (proj.type === 'train' || proj.type === 'laser') {
-            // Train pierces! Only hit each fighter once.
+          if (proj.type === 'train' || proj.type === 'laser' || proj.type === 'sword_wave') {
+            // Train/Sword wave pierces! Only hit each fighter once.
             if (proj.hitFighters.indexOf(fighter) === -1) {
               proj.hitFighters.push(fighter);
               hits.push({

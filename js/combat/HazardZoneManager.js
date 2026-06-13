@@ -1,5 +1,6 @@
 import * as EffectLib from '../effects_lib/index.js';
 import { safeFinite, safeDirection } from '../utils.js';
+import { soundSystem } from '../audio.js';
 
 export class HazardZoneManager {
   constructor() {
@@ -7,6 +8,7 @@ export class HazardZoneManager {
     this.gravityWells = [];
     this.burnZones = [];
     this.temporalFields = [];
+    this.swordArrays = [];
   }
 
   clear() {
@@ -14,6 +16,7 @@ export class HazardZoneManager {
     this.gravityWells = [];
     this.burnZones = [];
     this.temporalFields = [];
+    this.swordArrays = [];
   }
 
   addPoisonZone(x, y, ownerTeam, radius, duration, poisonDps, slowDuration) {
@@ -64,11 +67,24 @@ export class HazardZoneManager {
     });
   }
 
+  addSwordArray(x, y, ownerTeam, radius, duration) {
+    this.swordArrays.push({
+      x: safeFinite(x, 400),
+      y: safeFinite(y, 300),
+      ownerTeam: ownerTeam,
+      radius: radius || 280,
+      duration: duration || 5.0,
+      maxDuration: duration || 5.0,
+      tickTimer: 0
+    });
+  }
+
   update(dt, battle) {
     this.updatePoisonZones(dt, battle);
     this.updateGravityWells(dt, battle);
     this.updateBurnZones(dt, battle);
     this.updateTemporalFields(dt, battle);
+    this.updateSwordArrays(dt, battle);
   }
 
   updatePoisonZones(dt, battle) {
@@ -266,6 +282,108 @@ export class HazardZoneManager {
 
       if (field.duration <= 0) {
         this.temporalFields.splice(i, 1);
+        continue;
+      }
+    }
+  }
+
+  updateSwordArrays(dt, battle) {
+    const effectSystem = battle.effectSystem;
+    for (let i = this.swordArrays.length - 1; i >= 0; i--) {
+      const array = this.swordArrays[i];
+      array.duration -= dt;
+      array.tickTimer += dt;
+
+      // 1. High frequency sword rain ticks (every 0.25 seconds)
+      if (array.tickTimer >= 0.25) {
+        array.tickTimer = 0;
+        const enemies = getEnemies(array.ownerTeam, battle);
+        enemies.forEach(enemy => {
+          if (enemy.isAlive()) {
+            const dx = enemy.x - array.x;
+            const dy = enemy.y - array.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist <= array.radius) {
+              enemy.takeDamage(2, array.x, array.y, effectSystem);
+              
+              effectSystem.addParticle({
+                x: enemy.x + (Math.random() - 0.5) * 10,
+                y: enemy.y - 40,
+                vx: 0,
+                vy: 180,
+                life: 0.25,
+                maxLife: 0.25,
+                color: '#FFF9C4',
+                size: 2,
+                type: 'circle'
+              });
+            }
+          }
+        });
+      }
+
+      // 2. Spawn golden spark/sword particles in the array
+      if (Math.random() < 0.35) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * array.radius;
+        const px = array.x + Math.cos(angle) * dist;
+        const py = array.y + Math.sin(angle) * dist;
+        effectSystem.addParticle({
+          x: px,
+          y: py,
+          vx: 0,
+          vy: 50 + Math.random() * 50,
+          life: 0.4 + Math.random() * 0.3,
+          maxLife: 0.7,
+          color: '#FFD700',
+          size: 1.5 + Math.random() * 1.5,
+          gravity: 0,
+          friction: 0.96,
+          type: 'spark'
+        });
+      }
+
+      // 3. Cleave with giant Xuanyuan sword on expiration
+      if (array.duration <= 0) {
+        const enemies = getEnemies(array.ownerTeam, battle);
+        enemies.forEach(enemy => {
+          if (enemy.isAlive()) {
+            const dx = enemy.x - array.x;
+            const dy = enemy.y - array.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist <= array.radius) {
+              const lostHp = enemy.maxHp - enemy.hp;
+              const finalDmg = 35 + lostHp * 0.20;
+              enemy.takeDamage(finalDmg, array.x, array.y, effectSystem);
+              effectSystem.addHitEffect(enemy.x, enemy.y, '#FFD700');
+              effectSystem.addDamageNumber(enemy.x, enemy.y - enemy.charData.size, '轩辕斩!', true, '#FFD700');
+            }
+          }
+        });
+
+        // Slam visual effects
+        effectSystem.screenShake(15);
+        for (let k = 0; k < 45; k++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 100 + Math.random() * 250;
+          effectSystem.addParticle({
+            x: array.x,
+            y: array.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.4 + Math.random() * 0.4,
+            maxLife: 0.8,
+            color: k % 2 === 0 ? '#FFF9C4' : '#FFD700',
+            size: 3.0 + Math.random() * 4.0,
+            gravity: 0,
+            friction: 0.91,
+            type: 'circle'
+          });
+        }
+
+        if (soundSystem) soundSystem.playSkillSound();
+
+        this.swordArrays.splice(i, 1);
         continue;
       }
     }

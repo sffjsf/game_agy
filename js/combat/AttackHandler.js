@@ -22,6 +22,52 @@ export class AttackHandler {
     if (!f.target || !f.target.isAlive()) return;
 
     if (f.charData.weaponType === 'melee') {
+      if (f.charData.id === 'celestial_sword_deity') {
+        // 1. Release active passive swords in a fan shape towards target
+        if (f.swordCount > 0) {
+          const count = f.swordCount;
+          f.swordCount = 0;
+          
+          for (let i = 0; i < count; i++) {
+            const angleOffset = (i - (count - 1) / 2) * 0.12; // Spread flying swords in a fan shape
+            const dirX = Math.cos(f.angle + angleOffset);
+            const dirY = Math.sin(f.angle + angleOffset);
+            
+            weaponSystem.createRangedAttack(
+              f.x - Math.cos(f.angle) * 12,
+              f.y - Math.sin(f.angle) * 12,
+              f.x + dirX * 300,
+              f.y + dirY * 300,
+              f.charData.attackPower * 0.3, // Each flying sword deals 30% of attack power
+              f.team,
+              'flying_sword',
+              '#FFEB3B',
+              f,
+              f.battleContext.opposingTeam
+            );
+          }
+          if (soundSystem) soundSystem.playShootSound();
+        }
+
+        // 2. Spawn the basic attack sword wave directed towards target
+        weaponSystem.createRangedAttack(
+          f.x, f.y,
+          f.target.x, f.target.y,
+          f.charData.attackPower,
+          f.team,
+          'sword_wave',
+          '#FFF59D',
+          f,
+          f.battleContext.opposingTeam
+        );
+
+        // 3. Passive: gain a sword on attack
+        f.swordCount = Math.min((f.swordCount || 0) + 1, 9);
+
+        if (soundSystem) soundSystem.playSwingSound();
+        return;
+      }
+
       if (f.hasPassive('fire_cone_basic')) {
         f.executeFireConeAttack(effectSystem);
         if (soundSystem) soundSystem.playSwingSound();

@@ -43,6 +43,20 @@ export class FighterRenderer {
     ctx.stroke();
     ctx.restore();
 
+    // If ascended/airborne (during ultimate), draw a hover shadow on the ground
+    if (f.isAscended || f.celestialSwordsTimer > 0) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(f.x, f.y, f.charData.size * 0.9, f.charData.size * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Translate context vertically so everything else (body, hp, decorations, etc.) draws floating
+      const hoverOffset = -50 - Math.sin(time * 6) * 5;
+      ctx.translate(0, hoverOffset);
+    }
+
     // ── Body circle with glow ──
     ctx.shadowColor = f.charData.glowColor;
     ctx.shadowBlur = 12;
@@ -210,7 +224,7 @@ export class FighterRenderer {
 
     // ── Character decorations ──
     if (typeof f.charData.drawDecorations === 'function') {
-      f.charData.drawDecorations(ctx, f.x, f.y, f.angle, f.charData.size, time);
+      f.charData.drawDecorations(ctx, f.x, f.y, f.angle, f.charData.size, time, f);
     }
 
     // ── HP text centered on body ──
@@ -312,7 +326,7 @@ export class FighterRenderer {
         ctx.stroke();
 
         // Clone decorations
-        f.charData.drawDecorations(ctx, clone.x, clone.y, f.angle, f.charData.size, time);
+        f.charData.drawDecorations(ctx, clone.x, clone.y, f.angle, f.charData.size, time, clone);
       }
 
       ctx.restore();

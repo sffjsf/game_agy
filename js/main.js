@@ -8,6 +8,7 @@ import { UIManager } from './ui.js';
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('battle-canvas');
   const combatManager = new CombatManager(canvas);
+  window.combatManager = combatManager; // Expose for debugging and testing
   const uiManager = new UIManager();
 
   // Zoom & Pan state variables declared early to avoid Temporal Dead Zone (TDZ) issues during startup resize

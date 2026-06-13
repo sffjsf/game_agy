@@ -15,8 +15,8 @@ export class FighterHealth {
     attackerX = safeFinite(attackerX, f.x);
     attackerY = safeFinite(attackerY, f.y);
 
-    // Ult Invincibility or Chronoshift invulnerability check
-    if (f.ultInvincibilityTimer > 0 || (f.chronoshiftInvulnTimer && f.chronoshiftInvulnTimer > 0) || (f.chronoshiftTimer && f.chronoshiftTimer > 0)) {
+    // Ult Invincibility, Chronoshift invulnerability, or Sword Deity survival dash check
+    if (f.ultInvincibilityTimer > 0 || (f.chronoshiftInvulnTimer && f.chronoshiftInvulnTimer > 0) || (f.chronoshiftTimer && f.chronoshiftTimer > 0) || (f.invulnerableDashTimer && f.invulnerableDashTimer > 0)) {
       effectSystem.addDamageNumber(f.x, f.y - f.charData.size, '免伤!', false, '#E6C229');
       return;
     }
@@ -69,6 +69,11 @@ export class FighterHealth {
 
     f.hp -= damage;
     f.hp = clamp(f.hp, 0, f.maxHp);
+
+    // Passive: Celestial Sword Deity gains a flying sword when taking damage
+    if (f.hasPassive('passive_sword_array') && f.alive && f.hp > 0) {
+      f.swordCount = Math.min((f.swordCount || 0) + 1, 9);
+    }
 
     // Visual feedback
     f.hitFlashTimer = 0.15;

@@ -12,6 +12,8 @@ import { HomingOrbProjectile } from '../projectiles/HomingOrbProjectile.js';
 import { LaserProjectile } from '../projectiles/LaserProjectile.js';
 import { WaterOrbProjectile } from '../projectiles/WaterOrbProjectile.js';
 import { TimeBoltProjectile } from '../projectiles/TimeBoltProjectile.js';
+import { FlyingSwordProjectile } from '../projectiles/FlyingSwordProjectile.js';
+import { SwordWaveProjectile } from '../projectiles/SwordWaveProjectile.js';
 
 /**
  * Projectile type → constructor map.
@@ -31,6 +33,8 @@ const projectileTypes = {
   laser:            LaserProjectile,
   water_orb:        WaterOrbProjectile,
   time_bolt:        TimeBoltProjectile,
+  flying_sword:     FlyingSwordProjectile,
+  sword_wave:       SwordWaveProjectile,
 };
 
 export function createProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker) {

@@ -317,7 +317,68 @@ export function applyDamageReductionPassives(fighter, damage, effectSystem, atta
 }
 
 export function tryLethalSurvivalPassives(fighter, effectSystem) {
-  if (fighter.hp > 0 || fighter.rebirthUsed) return false;
+  if (fighter.hp > 0) return false;
+
+  if (fighter.hasPassive('passive_invulnerable_dash') && (!fighter.invulnerableDashCooldown || fighter.invulnerableDashCooldown <= 0)) {
+    fighter.hp = 30; // Survive with 30 HP
+    fighter.buffs.clearDebuffs();
+    fighter.invulnerableDashCooldown = 30.0;
+    fighter.invulnerableDashTimer = 0.4; // 0.4s slide
+
+    const backDx = -Math.cos(fighter.angle);
+    const backDy = -Math.sin(fighter.angle);
+    const dashDist = 150;
+    const startX = fighter.x;
+    const startY = fighter.y;
+
+    const arenaX = fighter.battleContext ? fighter.battleContext.arenaX : 50;
+    const arenaY = fighter.battleContext ? fighter.battleContext.arenaY : 50;
+    const arenaWidth = fighter.battleContext ? fighter.battleContext.arenaWidth : 700;
+    const arenaHeight = fighter.battleContext ? fighter.battleContext.arenaHeight : 500;
+
+    const targetX = Math.max(arenaX + 30, Math.min(arenaX + arenaWidth - 30, startX + backDx * dashDist));
+    const targetY = Math.max(arenaY + 30, Math.min(arenaY + arenaHeight - 30, startY + backDy * dashDist));
+
+    fighter.invulnerableDashVx = (targetX - startX) / 0.4;
+    fighter.invulnerableDashVy = (targetY - startY) / 0.4;
+
+    const getDistanceToSegment = (x, y, x1, y1, x2, y2) => {
+      const A = x - x1;
+      const B = y - y1;
+      const C = x2 - x1;
+      const D = y2 - y1;
+      const dot = A * C + B * D;
+      const lenSq = C * C + D * D;
+      let param = -1;
+      if (lenSq !== 0) param = dot / lenSq;
+      let xx, yy;
+      if (param < 0) { xx = x1; yy = y1; }
+      else if (param > 1) { xx = x2; yy = y2; }
+      else { xx = x1 + param * C; yy = y1 + param * D; }
+      const dx = x - xx;
+      const dy = y - yy;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const opposingTeam = fighter.battleContext ? fighter.battleContext.opposingTeam : [];
+    opposingTeam.forEach(enemy => {
+      if (enemy.isAlive()) {
+        const dist = getDistanceToSegment(enemy.x, enemy.y, startX, startY, targetX, targetY);
+        if (dist <= 60) {
+          enemy.takeDamage(30, startX, startY, effectSystem);
+          effectSystem.addHitEffect(enemy.x, enemy.y, '#FFD700');
+        }
+      }
+    });
+
+    effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '人剑合一!', false, '#FFD700');
+    EffectLib.addCloneEffect(effectSystem, fighter.x, fighter.y, '#FFD700', 45);
+    if (soundSystem) soundSystem.playSkillSound();
+
+    return true;
+  }
+
+  if (fighter.rebirthUsed) return false;
 
   if (fighter.hasPassive('inferno_rebirth')) {
     fighter.rebirthUsed = true;

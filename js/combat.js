@@ -60,6 +60,10 @@ export class CombatManager {
     return this.hazardZoneManager.temporalFields;
   }
 
+  get swordArrays() {
+    return this.hazardZoneManager.swordArrays;
+  }
+
   _computeArena() {
     const pad = 20;
     this.arenaWidth = this.canvas.width - pad * 2;
@@ -280,6 +284,10 @@ export class CombatManager {
 
   addTemporalField(...args) {
     this.hazardZoneManager.addTemporalField(...args);
+  }
+
+  addSwordArray(...args) {
+    this.hazardZoneManager.addSwordArray(...args);
   }
 
   resolveFighterCollision() {

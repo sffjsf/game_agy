@@ -26,6 +26,7 @@ export class CombatRenderer {
       this.drawPoisonZones(ctx, state.hazards.poisonZones, time);
       this.drawBurnZones(ctx, state.hazards.burnZones, time);
       this.drawTemporalFields(ctx, state.hazards.temporalFields, time);
+      this.drawSwordArrays(ctx, state.hazards.swordArrays, time);
 
       state.fightersLeft.forEach(f => f.render(ctx, time));
       state.fightersRight.forEach(f => f.render(ctx, time));
@@ -205,6 +206,142 @@ export class CombatRenderer {
       ctx.fill();
 
       ctx.restore();
+    });
+  }
+
+  drawSwordArrays(ctx, swordArrays, time) {
+    if (!swordArrays || swordArrays.length === 0) return;
+
+    swordArrays.forEach(array => {
+      // 1. Draw rotating Taiji (Yin-Yang) central symbol
+      ctx.save();
+      ctx.translate(array.x, array.y);
+      ctx.rotate(time * 0.5); // rotate slowly
+
+      // Draw outer circle
+      ctx.fillStyle = 'rgba(255, 235, 59, 0.03)';
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.18)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(0, 0, array.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      const r = array.radius * 0.45; // size of the Taiji central motif
+
+      // Yin half (light gold)
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.07)';
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
+      ctx.fill();
+
+      // Yang half (transparent)
+      ctx.fillStyle = 'rgba(255, 235, 59, 0.02)';
+      ctx.beginPath();
+      ctx.arc(0, 0, r, Math.PI / 2, -Math.PI / 2);
+      ctx.fill();
+
+      // Small s-curve circles
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.07)';
+      ctx.beginPath();
+      ctx.arc(0, r / 2, r / 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255, 235, 59, 0.02)';
+      ctx.beginPath();
+      ctx.arc(0, -r / 2, r / 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Small dots
+      ctx.fillStyle = 'rgba(255, 235, 59, 0.02)';
+      ctx.beginPath();
+      ctx.arc(0, r / 2, r / 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.07)';
+      ctx.beginPath();
+      ctx.arc(0, -r / 2, r / 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // 2. Draw outer Bagua (Eight Trigrams) octagonal markers
+      ctx.save();
+      ctx.translate(array.x, array.y);
+      ctx.rotate(-time * 0.3); // opposite rotation
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.16)';
+      ctx.lineWidth = 2;
+
+      for (let i = 0; i < 8; i++) {
+        ctx.rotate(Math.PI / 4);
+        ctx.beginPath();
+        // Inner trigram bar
+        ctx.moveTo(array.radius - 22, -12);
+        ctx.lineTo(array.radius - 22, 12);
+        // Outer trigram bar
+        ctx.moveTo(array.radius - 12, -8);
+        ctx.lineTo(array.radius - 12, 8);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 3. Draw falling sword rain particle indicators
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 235, 59, 0.35)';
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 6;
+
+      for (let s = 0; s < 5; s++) {
+        const seed = (Math.floor(time * 24) + s * 137) % 200;
+        // Pseudo-random offset based on seed
+        const randX = array.x + Math.sin(seed * 7.7) * (array.radius * 0.75);
+        const randY = array.y + Math.cos(seed * 3.3) * (array.radius * 0.75);
+        const progress = (time * 2.8 + s * 0.2) % 1.0;
+        const sy = randY - 70 + progress * 70;
+
+        ctx.beginPath();
+        ctx.moveTo(randX, sy - 14);
+        ctx.lineTo(randX, sy);
+        ctx.stroke();
+
+        // Crossguard
+        ctx.beginPath();
+        ctx.moveTo(randX - 3, sy - 4);
+        ctx.lineTo(randX + 3, sy - 4);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 4. Draw central condensing Xuanyuan Giant Sword during the last 1.0 second
+      if (array.duration <= 1.0) {
+        const chargeProgress = 1 - array.duration; // 0 to 1
+        ctx.save();
+        ctx.translate(array.x, array.y - 100 * (1 - chargeProgress));
+        ctx.globalAlpha = chargeProgress * 0.85;
+
+        ctx.fillStyle = '#FFFDE7';
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 3.5;
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 20;
+
+        // Giant Blade pointing straight down (+Y)
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(0, 90); // tip
+        ctx.lineTo(10, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Crossguard and Hilt
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(-22, -6, 44, 6);
+        ctx.fillRect(-5, -30, 10, 24);
+
+        ctx.restore();
+      }
     });
   }
 }
