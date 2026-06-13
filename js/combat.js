@@ -154,7 +154,22 @@ export class CombatManager {
       if (!skipDirectDamage) {
         const hitX = hit.projectile ? hit.projectile.x : hit.target.x;
         const hitY = hit.projectile ? hit.projectile.y : hit.target.y;
+
+        // Bounty mark: +40% damage vs targets below 50% HP
+        const attacker = hit.projectile ? hit.projectile.attacker : null;
+        if (attacker && attacker.hasPassive && attacker.hasPassive('bounty_mark')) {
+          const hpPercent = hit.target.hp / hit.target.maxHp;
+          if (hpPercent < 0.5) {
+            hit.damage *= 1.4;
+          }
+        }
+
         hit.target.takeDamage(hit.damage, hitX, hitY, this.effectSystem);
+
+        // Bounty mark: on-kill permanent attack speed boost (max 25 stacks)
+        if (!hit.target.isAlive() && attacker && attacker.hasPassive('bounty_mark')) {
+          attacker.bountyHunterStacks = Math.min((attacker.bountyHunterStacks || 0) + 1, 25);
+        }
       }
 
       hitProcessor.process(hit);

@@ -46,9 +46,23 @@ export class AttackHandler {
       );
 
       if (result.hit && f.target.isAlive()) {
-        f.applyMeleeHitPassives(result.damage, f.target, effectSystem);
-        f.target.takeDamage(result.damage, f.x, f.y, effectSystem);
-        f.healFromDamage(result.damage, effectSystem);
+        // Bounty mark: +40% damage vs targets below 50% HP
+        let finalDamage = result.damage;
+        if (f.hasPassive('bounty_mark')) {
+          const hpPercent = f.target.hp / f.target.maxHp;
+          if (hpPercent < 0.5) {
+            finalDamage *= 1.4;
+          }
+        }
+
+        f.applyMeleeHitPassives(finalDamage, f.target, effectSystem);
+        f.target.takeDamage(finalDamage, f.x, f.y, effectSystem);
+        f.healFromDamage(finalDamage, effectSystem);
+
+        // Bounty mark: on-kill permanent attack speed boost (max 25 stacks)
+        if (!f.target.isAlive() && f.hasPassive('bounty_mark')) {
+          f.bountyHunterStacks = Math.min((f.bountyHunterStacks || 0) + 1, 25);
+        }
 
         effectSystem.addHitEffect(f.target.x, f.target.y, f.charData.color);
         effectSystem.screenShake(3);

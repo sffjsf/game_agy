@@ -28,6 +28,12 @@ export class FighterAI {
       return;
     }
 
+    // Bounty Mark: target the lowest HP enemy instead of the closest
+    if (this.fighter.hasPassive && this.fighter.hasPassive('bounty_mark')) {
+      this._findLowestHpTarget(opposingTeam);
+      return;
+    }
+
     let closest = null;
     let minDist = Infinity;
 
@@ -59,6 +65,40 @@ export class FighterAI {
       }
     } else {
       this.fighter.target = closest;
+    }
+  }
+
+  /**
+   * Target the enemy with the lowest current HP (bounty_mark passive).
+   * Hysteresis: only switch if the new target has meaningfully lower HP.
+   */
+  _findLowestHpTarget(opposingTeam) {
+    let best = null;
+    let lowestHp = Infinity;
+
+    let currentTargetHp = Infinity;
+    if (this.fighter.target && this.fighter.target.isAlive()) {
+      currentTargetHp = this.fighter.target.hp;
+    }
+
+    for (let i = 0; i < opposingTeam.length; i++) {
+      const enemy = opposingTeam[i];
+      if (enemy.isAlive()) {
+        if (enemy.hp < lowestHp) {
+          lowestHp = enemy.hp;
+          best = enemy;
+        }
+      }
+    }
+
+    // Hysteresis: only switch if new target has at least 15 less HP (absolute)
+    // This prevents rapid target switching when multiple enemies are similarly wounded.
+    if (this.fighter.target && this.fighter.target.isAlive()) {
+      if (best !== this.fighter.target && lowestHp < currentTargetHp - 15) {
+        this.fighter.target = best;
+      }
+    } else {
+      this.fighter.target = best;
     }
   }
 

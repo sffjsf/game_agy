@@ -101,6 +101,9 @@ export class Fighter {
     this.mechaShieldUsed = false;
     this.sentryDroneTimer = 0;
 
+    // Bounty Hunter mechanics
+    this.bountyHunterStacks = 0;
+
     // Channeling skill state (e.g. Berserker whirlwind)
     this.channelTimer = 0;
     this.channelTick = 0;
@@ -790,6 +793,10 @@ export class Fighter {
     if (this.hasPassive('blood_rage')) {
       const hpPercent = this.hp / this.maxHp;
       rate *= (1 + (1 - hpPercent) * 1.5); // up to 2.5x at 0% HP
+    }
+    // Bounty mark: +4% attack speed per kill stack, max 100% (25 stacks)
+    if (this.hasPassive('bounty_mark') && this.bountyHunterStacks > 0) {
+      rate *= (1 + this.bountyHunterStacks * 0.04);
     }
     return rate;
   }
