@@ -22,7 +22,7 @@ export const dawn_goddess = {
     passives: [
       { id: 'dawn_blessing',
         name: '曙光祝福',
-        description: '命中敌人后，以自身为中心大范围友方回复 10 点生命，并短暂提升移动速度。' },
+        description: '命中敌人后，所有友方回复 10 点生命，并短暂提升移动速度。' },
       { id: 'dawn_resurrection',
         name: '黎明复苏',
         description: '击杀敌人后随机复活一位非召唤友方。' },
@@ -34,7 +34,7 @@ export const dawn_goddess = {
         description: '对带有负面状态的敌人造成 300% 额外伤害。' }
     ],
     specialEffects: [
-      { name: '曙光祝福', description: '命中后为大范围友军治疗并加速。' },
+      { name: '曙光祝福', description: '命中后为所有友军治疗并加速。' },
       { name: '黎明复苏', description: '击杀后复活一名阵亡的非召唤友方。' },
       { name: '终末曙光', description: '死亡后随机复活友方，可能复活自己。' },
       { name: '净化之光', description: '对灼烧、中毒、眩晕、减速等负面状态目标伤害大幅提升。' },

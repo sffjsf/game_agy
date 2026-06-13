@@ -320,16 +320,10 @@ export function triggerDawnBlessing(fighter, effectSystem) {
   const ownTeam = fighter.battleContext ? fighter.battleContext.ownTeam : null;
   if (!ownTeam) return;
 
-  const radius = 220;
   ownTeam.forEach(ally => {
     if (!ally.isAlive()) return;
-    const dx = ally.x - fighter.x;
-    const dy = ally.y - fighter.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist <= radius) {
-      ally.heal(10, effectSystem);
-      ally.dawnSpeedTimer = 2.0;
-    }
+    ally.heal(10, effectSystem);
+    ally.dawnSpeedTimer = 2.0;
   });
   effectSystem.addHealEffect(fighter.x, fighter.y);
   effectSystem.addDamageNumber(fighter.x, fighter.y - fighter.charData.size, '曙光祝福!', false, '#FFF176');
