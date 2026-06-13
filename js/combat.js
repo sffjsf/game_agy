@@ -70,25 +70,27 @@ export class CombatManager {
     this.fightersLeft = [];
     this.fightersRight = [];
 
+    const maxSpacing = 70;
     const spawnXLeft = this.arenaX + 80;
     const spawnXRight = this.arenaX + this.arenaWidth - 80;
     const centerY = this.arenaY + this.arenaHeight / 2;
-    const spacing = 70; // Vertical spacing
 
     // Spawn Left Team
     const numLeft = leftIds.length;
-    const startYLeft = centerY - ((numLeft - 1) * spacing) / 2;
+    const spacingLeft = numLeft > 1 ? Math.min(maxSpacing, (this.arenaHeight - 80) / (numLeft - 1)) : maxSpacing;
+    const startYLeft = centerY - ((numLeft - 1) * spacingLeft) / 2;
     for (let i = 0; i < numLeft; i++) {
-      const y = startYLeft + i * spacing;
+      const y = startYLeft + i * spacingLeft;
       const f = new Fighter(leftIds[i], spawnXLeft, y, 'left');
       this.fightersLeft.push(f);
     }
 
     // Spawn Right Team
     const numRight = rightIds.length;
-    const startYRight = centerY - ((numRight - 1) * spacing) / 2;
+    const spacingRight = numRight > 1 ? Math.min(maxSpacing, (this.arenaHeight - 80) / (numRight - 1)) : maxSpacing;
+    const startYRight = centerY - ((numRight - 1) * spacingRight) / 2;
     for (let i = 0; i < numRight; i++) {
-      const y = startYRight + i * spacing;
+      const y = startYRight + i * spacingRight;
       const f = new Fighter(rightIds[i], spawnXRight, y, 'right');
       this.fightersRight.push(f);
     }
@@ -356,7 +358,7 @@ export class CombatManager {
     this._drawArena(ctx);
 
     // ── Battle / Finished rendering ──
-    if (this.state === 'fighting' || this.state === 'finished') {
+    if (this.state === 'countdown' || this.state === 'fighting' || this.state === 'finished') {
       const time = performance.now() / 1000;
       this.fightersLeft.forEach(f => f.render(ctx, time));
       this.fightersRight.forEach(f => f.render(ctx, time));

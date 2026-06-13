@@ -35,6 +35,22 @@
         <div class="character-grid" id="right-grid"></div>
       </div>
     </div>
+    <div class="settings-container" style="display: flex; gap: 15px; align-items: center; justify-content: center; margin-top: 10px; margin-bottom: 15px;">
+      <label for="arena-size-select" style="font-family: var(--font-cn); font-weight: 700; color: var(--text-dim); font-size: 0.95rem;">地图尺寸 (Battlefield Size):</label>
+      <select id="arena-size-select" class="select-global">
+        <option value="auto">🌟 智能自适应 (Auto-responsive)</option>
+        <option value="800x600">800 × 600 (标准 Standard)</option>
+        <option value="1024x768">1024 × 768 (经典 Classic)</option>
+        <option value="1280x720">1280 × 720 (宽屏 720p)</option>
+        <option value="1920x1080">1920 × 1080 (全高清 1080p)</option>
+        <option value="custom">✏️ 自定义尺寸... (Custom Size...)</option>
+      </select>
+      <div id="custom-size-inputs" style="display: none; gap: 10px; align-items: center;">
+        <input type="number" id="custom-width" placeholder="宽 (Width)" min="400" max="3840" value="1000" class="input-global" style="width: 100px;">
+        <span style="color: var(--text-dim);">×</span>
+        <input type="number" id="custom-height" placeholder="高 (Height)" min="300" max="2160" value="600" class="input-global" style="width: 100px;">
+      </div>
+    </div>
     <div style="display: flex; gap: 20px; justify-content: center; margin-top: 20px;">
       <button id="start-btn" class="btn-primary" disabled>选择角色开始战斗</button>
       <button id="open-codex-btn" class="btn-secondary">📖 英雄图鉴</button>
@@ -71,10 +87,20 @@
     </div>
 
     <div id="canvas-container">
-      <canvas id="battle-canvas"></canvas>
+      <div id="canvas-wrapper">
+        <canvas id="battle-canvas"></canvas>
+        <div id="countdown-overlay" style="display:none">
+          <span id="countdown-text">3</span>
+        </div>
+      </div>
     </div>
-    <div id="countdown-overlay" style="display:none">
-      <span id="countdown-text">3</span>
+
+    <!-- 缩放与平移控制器 -->
+    <div id="zoom-controls" class="zoom-controls">
+      <button id="zoom-out-btn" class="zoom-btn" title="缩小 (Zoom Out)">−</button>
+      <span id="zoom-percentage">100%</span>
+      <button id="zoom-in-btn" class="zoom-btn" title="放大 (Zoom In)">+</button>
+      <button id="zoom-reset-btn" class="zoom-btn reset" title="重置/自适应 (Reset)">Reset</button>
     </div>
   </div>
 

@@ -190,6 +190,59 @@ export class FighterRenderer {
       ctx.restore();
     }
 
+    // ── Render spawn name next to fighter during first 3 seconds ──
+    const nameTimer = f.spawnNameTimer !== undefined ? f.spawnNameTimer : 3.0;
+    if (nameTimer > 0 && !f.charData.hidden) {
+      ctx.save();
+      
+      // Fade out in the last 1.2 seconds of the timer
+      const alpha = Math.min(1.0, nameTimer / 1.2);
+      ctx.globalAlpha = alpha;
+      
+      const nameText = (f.charData.isHero ? '⭐' : '') + (f.charData.nameCN || f.charData.name);
+      ctx.font = "bold 30px 'Noto Sans SC', 'Outfit', sans-serif";
+      
+      const teamColor = f.team === 'left' ? '#00E5FF' : '#FF3D00';
+      ctx.fillStyle = teamColor;
+      
+      // Shadow for high readability against grid background
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
+      
+      if (f.team === 'left') {
+        // Left team name on the right side (inner side)
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(nameText, f.x + f.charData.size + 32, f.y);
+        
+        // Draw team-colored circular indicator dot
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.fillStyle = teamColor;
+        ctx.beginPath();
+        ctx.arc(f.x + f.charData.size + 14, f.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Right team name on the left side (inner side)
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(nameText, f.x - f.charData.size - 32, f.y);
+        
+        // Draw team-colored circular indicator dot
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.fillStyle = teamColor;
+        ctx.beginPath();
+        ctx.arc(f.x - f.charData.size - 14, f.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 }

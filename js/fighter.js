@@ -84,6 +84,7 @@ export class Fighter {
 
     // Visual state
     this.hitFlashTimer = 0;
+    this.spawnNameTimer = 3.0; // Show name next to fighter on entry
 
     // Ninja clone state
     this.clones = [];
@@ -178,6 +179,9 @@ export class Fighter {
     this.hitFlashTimer = Math.max(0, this.hitFlashTimer - dt);
     this.blinkCooldown = Math.max(0, this.blinkCooldown - dt);
     this.cloneTimer = Math.max(0, this.cloneTimer - dt);
+    if (this.spawnNameTimer > 0) {
+      this.spawnNameTimer = Math.max(0, this.spawnNameTimer - dt);
+    }
     this.heavenlyEyeCooldown = Math.max(0, (this.heavenlyEyeCooldown || 0) - dt);
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
 

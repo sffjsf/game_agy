@@ -513,6 +513,38 @@ export class UIManager {
 
     // Speed Control Slider — now handled in main.js
 
+    // Battlefield size select toggle
+    const sizeSelect = document.getElementById('arena-size-select');
+    const customSizeInputs = document.getElementById('custom-size-inputs');
+    const customWidthInput = document.getElementById('custom-width');
+    const customHeightInput = document.getElementById('custom-height');
+
+    if (sizeSelect && customSizeInputs) {
+      sizeSelect.addEventListener('change', (e) => {
+        if (soundSystem) soundSystem.init();
+        if (soundSystem) soundSystem.playClickSound();
+        if (e.target.value === 'custom') {
+          customSizeInputs.style.display = 'flex';
+        } else {
+          customSizeInputs.style.display = 'none';
+        }
+      });
+    }
+
+    const validateInput = (input, min, max) => {
+      input.addEventListener('blur', () => {
+        let val = parseInt(input.value);
+        if (isNaN(val) || val < min) {
+          input.value = min;
+        } else if (val > max) {
+          input.value = max;
+        }
+      });
+    };
+
+    if (customWidthInput) validateInput(customWidthInput, 400, 3840);
+    if (customHeightInput) validateInput(customHeightInput, 300, 2160);
+
     // Keyboard navigation for result screen
     document.addEventListener('keydown', (e) => {
       const resultScreen = document.getElementById('result-screen');
