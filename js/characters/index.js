@@ -46,6 +46,7 @@ import { celestial_sword_deity } from './CelestialSwordDeity.js';
 import { frost_lord } from './FrostLord.js';
 import { ice_servant } from './IceServant.js';
 import { two_faced_sukuna } from './TwoFacedSukuna.js';
+import { gan_jiang_mo_ye } from './GanJiangMoYe.js';
 
 /**
  * Required fields every character data object must have.
@@ -178,7 +179,8 @@ export const characterData = {
   celestial_sword_deity,
   frost_lord,
   ice_servant,
-  two_faced_sukuna
+  two_faced_sukuna,
+  gan_jiang_mo_ye
 };
 
 // ── Validate all characters on import (dev-only safety net) ──

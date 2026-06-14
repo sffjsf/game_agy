@@ -166,6 +166,14 @@ export class Fighter {
     this.sukunaPassiveSlash = null;
     this.sukunaLowHpBasicFollowup = false;
 
+    // Gan Jiang Mo Ye mechanics
+    this.convergenceSwordMarkTimer = 0;
+    this.convergenceSwordMarkTeam = null;
+    this.ganjiangMoyePierce = null;
+    this.ganjiangMoyeDeathCounterCooldown = 0;
+    this.ganjiangMoyeDeathCounterActive = false;
+    this.ganjiangMoyeSwordHitsByBatch = {};
+
     // Reference to enemy target (set externally)
     this.target = null;
     this.ai = new FighterAI(this);
@@ -371,6 +379,11 @@ export class Fighter {
     this.ultInvincibilityTimer = Math.max(0, (this.ultInvincibilityTimer || 0) - dt);
     this.frostLandTimer = Math.max(0, (this.frostLandTimer || 0) - dt);
     this.sukunaOverhealCooldown = Math.max(0, (this.sukunaOverhealCooldown || 0) - dt);
+    this.ganjiangMoyeDeathCounterCooldown = Math.max(0, (this.ganjiangMoyeDeathCounterCooldown || 0) - dt);
+    this.convergenceSwordMarkTimer = Math.max(0, (this.convergenceSwordMarkTimer || 0) - dt);
+    if (this.convergenceSwordMarkTimer <= 0) {
+      this.convergenceSwordMarkTeam = null;
+    }
 
     if (this.isDebuffImmune()) {
       this.buffs.clearAllNegativeEffects();
@@ -385,6 +398,16 @@ export class Fighter {
     }
 
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
+
+    if (AttackHandler.updateGanJiangMoYePierce(this, dt, effectSystem)) {
+      this.x = clamp(this.x, arenaX + 30, arenaX + arenaWidth - 30);
+      this.y = clamp(this.y, arenaY + 30, arenaY + arenaHeight - 30);
+      if (!isFinite(this.x)) this.x = arenaX + arenaWidth / 2;
+      if (!isFinite(this.y)) this.y = arenaY + arenaHeight / 2;
+      this.hp = safeFinite(this.hp, this.maxHp);
+      this.angle = normaliseAngle(this.angle);
+      return;
+    }
 
     AttackHandler.tryStartSukunaOverhealHunt(this, effectSystem);
 
@@ -905,6 +928,31 @@ export class Fighter {
    */
   hasPassive(passiveId) {
     return !!(this.charData.passives && this.charData.passives.some(passive => passive.id === passiveId));
+  }
+
+  applyConvergenceSwordMark(sourceFighter, effectSystem) {
+    this.convergenceSwordMarkTimer = 5.0;
+    if (typeof sourceFighter === 'string') {
+      this.convergenceSwordMarkTeam = sourceFighter;
+    } else {
+      this.convergenceSwordMarkTeam = sourceFighter ? sourceFighter.team : (this.team === 'left' ? 'right' : 'left');
+    }
+    if (effectSystem) {
+      effectSystem.addDamageNumber(this.x, this.y - this.charData.size - 18, '交汇剑痕', false, '#E040FB');
+      effectSystem.addParticle({
+        x: this.x,
+        y: this.y,
+        vx: 0,
+        vy: 0,
+        life: 0.35,
+        maxLife: 0.35,
+        color: 'rgba(224, 64, 251, 0.75)',
+        size: this.charData.size * 1.15,
+        gravity: 0,
+        friction: 1,
+        type: 'ring'
+      });
+    }
   }
 
   updatePassiveTimers(dt) {

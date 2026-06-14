@@ -30,6 +30,32 @@ export class ProjectileHitProcessor {
       }
     }
 
+    if (projectile.type === 'ganjiang_moye_sword') {
+      if (projectile.markOnHit && attacker && hit.target.applyConvergenceSwordMark) {
+        hit.target.applyConvergenceSwordMark(attacker, this.effectSystem);
+      }
+
+      if (projectile.basicSword && attacker && attacker.isAlive()) {
+        const batchId = projectile.batchId || 'single';
+        hit.target.ganjiangMoyeSwordHitsByBatch = hit.target.ganjiangMoyeSwordHitsByBatch || {};
+        const record = hit.target.ganjiangMoyeSwordHitsByBatch[batchId] || { ganjiang: false, moye: false, stunned: false };
+        if (projectile.swordName === 'ganjiang') record.ganjiang = true;
+        if (projectile.swordName === 'moye') record.moye = true;
+        if (record.ganjiang && record.moye && !record.stunned) {
+          record.stunned = true;
+          hit.target.applyStun(1.2);
+          EffectLib.addStunEffect(this.effectSystem, hit.target.x, hit.target.y, '#E040FB', 30);
+          this.effectSystem.addDamageNumber(hit.target.x, hit.target.y - hit.target.charData.size - 18, '双剑交汇!', false, '#E040FB');
+        }
+        hit.target.ganjiangMoyeSwordHitsByBatch[batchId] = record;
+
+        if ((hit.actualDamage || 0) > 0) {
+          attacker.heal(hit.actualDamage, this.effectSystem);
+        }
+        return;
+      }
+    }
+
     switch (projectile.type) {
       case 'bomb':
         this.applyAreaDamage(projectile.x, projectile.y, projectile.ownerId, hit.damage, 105, attacker);

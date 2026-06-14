@@ -185,7 +185,13 @@ export class CombatManager {
           hit.damage = Passives.applyDawnDebuffBonus(attacker, hit.target, hit.damage, this.effectSystem);
         }
 
-        hit.target.takeDamage(hit.damage, hitX, hitY, this.effectSystem);
+        const beforeHp = hit.target.hp;
+        hit.target.takeDamage(hit.damage, hitX, hitY, this.effectSystem, {
+          attacker,
+          sourceTeam: attacker ? attacker.team : (hit.projectile ? hit.projectile.ownerId : null),
+          projectile: hit.projectile
+        });
+        hit.actualDamage = Math.max(0, beforeHp - hit.target.hp);
         if (attacker) {
           Passives.triggerDawnBlessing(attacker, this.effectSystem);
           if (hit.target.hp <= 0 || hit.target.state === 'dead') {
@@ -254,7 +260,11 @@ export class CombatManager {
       if (!enemy.isAlive()) return;
       const dir = safeDirection(enemy.x - x, enemy.y - y);
       if (dir.dist <= radius) {
-        enemy.takeDamage(damage, x, y, this.effectSystem);
+        enemy.takeDamage(damage, x, y, this.effectSystem, {
+          attacker,
+          sourceTeam: attacker ? attacker.team : ownerTeam,
+          source: 'area'
+        });
         if (attacker && attacker.isAlive()) {
           attacker.healFromDamage(damage, this.effectSystem);
         }

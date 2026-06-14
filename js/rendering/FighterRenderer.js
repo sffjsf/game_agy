@@ -203,6 +203,32 @@ export class FighterRenderer {
       ctx.restore();
     }
 
+    // ── Convergence sword mark overlay ──
+    if (f.convergenceSwordMarkTimer > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.45 + Math.sin(time * 10) * 0.15;
+      ctx.translate(f.x, f.y);
+      ctx.rotate(time * 2.4);
+      ctx.strokeStyle = '#E040FB';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#E040FB';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(0, 0, f.charData.size + 9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#FF5252';
+      ctx.beginPath();
+      ctx.moveTo(-f.charData.size * 0.9, -f.charData.size * 0.9);
+      ctx.lineTo(f.charData.size * 0.9, f.charData.size * 0.9);
+      ctx.stroke();
+      ctx.strokeStyle = '#29B6F6';
+      ctx.beginPath();
+      ctx.moveTo(-f.charData.size * 0.9, f.charData.size * 0.9);
+      ctx.lineTo(f.charData.size * 0.9, -f.charData.size * 0.9);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // ── Bleed overlay (dripping blood droplets) ──
     if (f.bleedTimer > 0) {
       ctx.save();

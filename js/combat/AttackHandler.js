@@ -3,6 +3,7 @@ import * as Passives from '../skills/Passives.js';
 import { executeSkillStrategy } from '../skills/SkillRegistry.js';
 import { soundSystem } from '../audio.js';
 import { getArenaBoundaryIntersection } from '../skills/abilities/BlazingStampede.js';
+import { createProjectile } from './Projectile.js';
 import { clamp } from '../utils.js';
 
 /**
@@ -33,6 +34,12 @@ export class AttackHandler {
         f.sukunaLowHpBasicFollowup = f.hp < f.maxHp * 0.5;
         AttackHandler.executeSukunaBasicSpin(f, effectSystem);
         if (soundSystem) soundSystem.playSwingSound();
+        return;
+      }
+
+      if (f.charData.id === 'gan_jiang_mo_ye') {
+        AttackHandler.executeGanJiangMoYeBasicAttack(f, weaponSystem, effectSystem);
+        if (soundSystem) soundSystem.playShootSound();
         return;
       }
 
@@ -179,7 +186,7 @@ export class AttackHandler {
         finalDamage = Passives.applyDawnDebuffBonus(f, f.target, finalDamage, effectSystem);
 
         f.applyMeleeHitPassives(finalDamage, f.target, effectSystem);
-        f.target.takeDamage(finalDamage, f.x, f.y, effectSystem);
+        f.target.takeDamage(finalDamage, f.x, f.y, effectSystem, { attacker: f, sourceTeam: f.team, source: 'basic' });
         f.healFromDamage(finalDamage, effectSystem);
         Passives.triggerDawnBlessing(f, effectSystem);
         if (f.target.hp <= 0 || f.target.state === 'dead') {
@@ -479,6 +486,138 @@ export class AttackHandler {
     }
   }
 
+  static executeGanJiangMoYeBasicAttack(f, weaponSystem, effectSystem, options = {}) {
+    if (!f.battleContext || !f.battleContext.opposingTeam || !weaponSystem) return;
+
+    const target = AttackHandler.findNearestEnemy(f, f.battleContext.opposingTeam);
+    if (!target) return;
+
+    f.target = target;
+    f.angle = Math.atan2(target.y - f.y, target.x - f.x);
+    const batchId = options.batchId || `gm_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    const damage = options.damage || f.charData.attackPower || 5;
+
+    AttackHandler.spawnGanJiangMoYeSword(f, weaponSystem, target, {
+      swordName: 'ganjiang',
+      side: -1,
+      curveSign: -1,
+      color: '#F44336',
+      batchId,
+      damage,
+      basicSword: true,
+      visualOnly: options.visualOnly
+    });
+    AttackHandler.spawnGanJiangMoYeSword(f, weaponSystem, target, {
+      swordName: 'moye',
+      side: 1,
+      curveSign: 1,
+      color: '#2196F3',
+      batchId,
+      damage,
+      basicSword: true,
+      visualOnly: options.visualOnly
+    });
+
+    effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 24, '干将莫邪!', false, '#E040FB');
+    effectSystem.screenShake(4);
+  }
+
+  static spawnGanJiangMoYeSword(f, weaponSystem, target, config) {
+    const baseAngle = Math.atan2(target.y - f.y, target.x - f.x);
+    const sideAngle = baseAngle + Math.PI / 2;
+    const spawnOffset = (f.charData.size || 36) * 0.72;
+    const spawnX = f.x + Math.cos(sideAngle) * spawnOffset * config.side;
+    const spawnY = f.y + Math.sin(sideAngle) * spawnOffset * config.side;
+    const launchAngle = baseAngle + config.curveSign * (35 * Math.PI / 180);
+    const speed = 820;
+    const proj = createProjectile(
+      spawnX,
+      spawnY,
+      Math.cos(launchAngle) * speed,
+      Math.sin(launchAngle) * speed,
+      config.visualOnly ? 0 : config.damage,
+      f.team,
+      config.color,
+      18,
+      'ganjiang_moye_sword'
+    );
+    proj.attacker = f;
+    proj.opposingTeam = f.battleContext.opposingTeam;
+    proj.preferredTarget = target;
+    proj.swordName = config.swordName;
+    proj.curveSign = config.curveSign;
+    proj.batchId = config.batchId;
+    proj.basicSword = !!config.basicSword;
+    proj.markOnHit = true;
+    proj.giantScale = config.basicSword ? 3.0 : 2.7;
+    if (f.battleContext) {
+      proj.arenaBounds = {
+        x: f.battleContext.arenaX,
+        y: f.battleContext.arenaY,
+        width: f.battleContext.arenaWidth,
+        height: f.battleContext.arenaHeight
+      };
+    }
+    weaponSystem.projectiles.push(proj);
+    return proj;
+  }
+
+  static findNearestEnemy(f, opposingTeam) {
+    let target = null;
+    let minDistSq = Infinity;
+    opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive() || enemy.invisibleTimer > 0) return;
+      const dx = enemy.x - f.x;
+      const dy = enemy.y - f.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < minDistSq) {
+        minDistSq = distSq;
+        target = enemy;
+      }
+    });
+    return target;
+  }
+
+  static executeGanJiangMoYeDeathCounter(f, effectSystem) {
+    if (!f.battleContext || !f.battleContext.opposingTeam) return false;
+    const target = AttackHandler.findNearestEnemy(f, f.battleContext.opposingTeam);
+    if (!target) return false;
+
+    const batchId = `gm_death_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    const damage = f.charData.attackPower || 5;
+    let healed = 0;
+    ['ganjiang', 'moye'].forEach((swordName, index) => {
+      if (!target.isAlive()) return;
+      const beforeHp = target.hp;
+      target.takeDamage(damage, f.x, f.y, effectSystem, { attacker: f, sourceTeam: f.team, source: 'death_counter' });
+      const dealt = Math.max(0, beforeHp - target.hp);
+      if (dealt > 0) {
+        f.heal(dealt, effectSystem);
+        healed += dealt;
+      }
+      if (target.applyConvergenceSwordMark) target.applyConvergenceSwordMark(f, effectSystem);
+      target.ganjiangMoyeSwordHitsByBatch = target.ganjiangMoyeSwordHitsByBatch || {};
+      const record = target.ganjiangMoyeSwordHitsByBatch[batchId] || { ganjiang: false, moye: false, stunned: false };
+      record[swordName] = true;
+      if (record.ganjiang && record.moye && !record.stunned) {
+        record.stunned = true;
+        target.applyStun(1.2);
+        EffectLib.addStunEffect(effectSystem, target.x, target.y, '#E040FB', 30);
+      }
+      target.ganjiangMoyeSwordHitsByBatch[batchId] = record;
+      effectSystem.addHitEffect(target.x, target.y, index === 0 ? '#F44336' : '#2196F3');
+    });
+
+    const weaponSystem = f.battleContext.weaponSystem;
+    if (weaponSystem) {
+      AttackHandler.executeGanJiangMoYeBasicAttack(f, weaponSystem, effectSystem, { visualOnly: true, batchId: `${batchId}_visual` });
+    }
+    if (healed > 0) {
+      effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 28, '双剑续命!', false, '#E040FB');
+    }
+    return healed > 0;
+  }
+
   static executeSukunaBasicSpin(f, effectSystem) {
     if (!f.battleContext || !f.battleContext.opposingTeam) return;
 
@@ -728,6 +867,53 @@ export class AttackHandler {
     EffectLib.addBackstabEffect(effectSystem, target.x, target.y, '#FF1744', 26);
     effectSystem.screenShake(3);
     if (soundSystem) soundSystem.playCritSound();
+  }
+
+  static updateGanJiangMoYePierce(f, dt, effectSystem) {
+    const pierce = f.ganjiangMoyePierce;
+    if (!pierce || !f.battleContext || !f.battleContext.opposingTeam) return false;
+
+    pierce.timer += dt;
+    const pct = Math.min(1, pierce.timer / (pierce.duration || 0.42));
+    const prevX = f.x;
+    const prevY = f.y;
+    f.x = pierce.startX + (pierce.endX - pierce.startX) * pct;
+    f.y = pierce.startY + (pierce.endY - pierce.startY) * pct;
+    f.angle = Math.atan2(pierce.endY - pierce.startY, pierce.endX - pierce.startX);
+    f.ultInvincibilityTimer = Math.max(f.ultInvincibilityTimer || 0, 0.18);
+
+    effectSystem.addTrail(f.x, f.y, pct % 0.2 < 0.1 ? '#F44336' : '#2196F3', 9);
+
+    const pathDx = f.x - prevX;
+    const pathDy = f.y - prevY;
+    const pathLenSq = pathDx * pathDx + pathDy * pathDy;
+    f.battleContext.opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive() || pierce.hitTargets.indexOf(enemy) !== -1) return;
+      let distToPath;
+      if (pathLenSq <= 1) {
+        const dx = enemy.x - f.x;
+        const dy = enemy.y - f.y;
+        distToPath = Math.sqrt(dx * dx + dy * dy);
+      } else {
+        const t = Math.max(0, Math.min(1, ((enemy.x - prevX) * pathDx + (enemy.y - prevY) * pathDy) / pathLenSq));
+        const closestX = prevX + pathDx * t;
+        const closestY = prevY + pathDy * t;
+        distToPath = Math.sqrt((enemy.x - closestX) * (enemy.x - closestX) + (enemy.y - closestY) * (enemy.y - closestY));
+      }
+      if (distToPath <= 68 + enemy.charData.size * 0.25) {
+        pierce.hitTargets.push(enemy);
+        if (enemy.applyConvergenceSwordMark) enemy.applyConvergenceSwordMark(f, effectSystem);
+        effectSystem.addHitEffect(enemy.x, enemy.y, '#E040FB');
+      }
+    });
+
+    if (pct >= 1) {
+      f.ganjiangMoyePierce = null;
+      f.ultInvincibilityTimer = 0;
+      f.setState('chase');
+    }
+
+    return true;
   }
 
   /**

@@ -14,6 +14,7 @@ import { WaterOrbProjectile } from '../projectiles/WaterOrbProjectile.js';
 import { TimeBoltProjectile } from '../projectiles/TimeBoltProjectile.js';
 import { FlyingSwordProjectile } from '../projectiles/FlyingSwordProjectile.js';
 import { SwordWaveProjectile } from '../projectiles/SwordWaveProjectile.js';
+import { GanJiangMoYeSwordProjectile } from '../projectiles/GanJiangMoYeSwordProjectile.js';
 
 /**
  * Projectile type → constructor map.
@@ -35,6 +36,7 @@ const projectileTypes = {
   time_bolt:        TimeBoltProjectile,
   flying_sword:     FlyingSwordProjectile,
   sword_wave:       SwordWaveProjectile,
+  ganjiang_moye_sword: GanJiangMoYeSwordProjectile,
 };
 
 export function createProjectile(x, y, vx, vy, damage, ownerId, color, size, type, attacker) {

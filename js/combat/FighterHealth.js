@@ -2,6 +2,7 @@ import * as Passives from '../skills/Passives.js';
 import { soundSystem } from '../audio.js';
 import { safeFinite, safeDirection, clamp } from '../utils.js';
 import * as EffectLib from '../effects_lib/index.js';
+import { AttackHandler } from './AttackHandler.js';
 
 export class FighterHealth {
   static takeDamage(f, damage, attackerX, attackerY, effectSystem, options) {
@@ -30,13 +31,34 @@ export class FighterHealth {
 
     if (FighterHealth.tryDamageAvoidancePassives(f, effectSystem)) return;
 
+    const isBurnDamage = options && options.type === 'burn';
+    if (!isBurnDamage && FighterHealth.tryGanJiangMoYeRandomPierce(f, damage, effectSystem)) return;
+
+    let sourceTeam = (options && options.sourceTeam) || (options && options.attacker && options.attacker.team);
+    if (!sourceTeam && f.battleContext) {
+      const allFighters = [...(f.battleContext.ownTeam || []), ...(f.battleContext.opposingTeam || [])];
+      const match = allFighters.find(fighter => fighter.isAlive() && Math.abs(fighter.x - attackerX) < 2 && Math.abs(fighter.y - attackerY) < 2);
+      if (match) {
+        sourceTeam = match.team;
+      }
+    }
+    if (!sourceTeam) {
+      sourceTeam = f.team === 'left' ? 'right' : 'left';
+    }
+
+    if (damage > 0 && f.convergenceSwordMarkTimer > 0 && f.convergenceSwordMarkTeam && sourceTeam === f.convergenceSwordMarkTeam) {
+      damage *= 2;
+      f.convergenceSwordMarkTimer = 0;
+      f.convergenceSwordMarkTeam = null;
+      effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 24, '剑痕爆发 x2!', true, '#E040FB');
+    }
+
     // Acid corrosion: +30% damage taken
     if (f.corrosionTimer > 0) {
       damage *= 1.30;
     }
 
     damage = FighterHealth.applyDamageReductionPassives(f, damage, effectSystem, attackerX, attackerY);
-    const isBurnDamage = options && options.type === 'burn';
     const shouldTriggerFrostShield = f.hasPassive && f.hasPassive('frost_shield') && !isBurnDamage;
     if (shouldTriggerFrostShield) {
       const cap = f.maxHp * 0.05;
@@ -143,6 +165,11 @@ export class FighterHealth {
         }
       }
 
+      if (FighterHealth.tryGanJiangMoYeDeathCounter(f, effectSystem)) {
+        f.setState('chase');
+        return;
+      }
+
       if (timeTraveler) {
         timeTraveler.chronoshiftUsed = true;
         f.hp = 1;
@@ -181,6 +208,48 @@ export class FighterHealth {
     }
     f.hp = clamp(f.hp + amount, 0, f.maxHp);
     effectSystem.addHealEffect(f.x, f.y);
+  }
+
+  static tryGanJiangMoYeRandomPierce(f, damage, effectSystem) {
+    if (!f.hasPassive || !f.hasPassive('ganjiang_moye_random_pierce')) return false;
+    if (f.ganjiangMoyePierce || damage <= 0) return false;
+    if (Math.random() >= 0.25) return false;
+    const ctx = f.battleContext;
+    if (!ctx) return false;
+
+    const margin = 36;
+    const endX = ctx.arenaX + margin + Math.random() * Math.max(1, ctx.arenaWidth - margin * 2);
+    const endY = ctx.arenaY + margin + Math.random() * Math.max(1, ctx.arenaHeight - margin * 2);
+    f.ganjiangMoyePierce = {
+      startX: f.x,
+      startY: f.y,
+      endX,
+      endY,
+      timer: 0,
+      duration: 0.42,
+      hitTargets: []
+    };
+    f.ultInvincibilityTimer = Math.max(f.ultInvincibilityTimer || 0, 0.42);
+    effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 22, '剑遁免伤!', false, '#E040FB');
+    EffectLib.addDashEffect(effectSystem, f.x, f.y, '#E040FB', 36);
+    if (soundSystem) soundSystem.playSkillSound();
+    return true;
+  }
+
+  static tryGanJiangMoYeDeathCounter(f, effectSystem) {
+    if (!f.hasPassive || !f.hasPassive('ganjiang_moye_death_counter')) return false;
+    if ((f.ganjiangMoyeDeathCounterCooldown || 0) > 0) return false;
+    if (!f.battleContext || !f.battleContext.opposingTeam || f.battleContext.opposingTeam.every(enemy => !enemy.isAlive())) return false;
+
+    f.ganjiangMoyeDeathCounterCooldown = 4.0;
+    f.ganjiangMoyeDeathCounterActive = true;
+    f.hp = 1;
+    f.ultInvincibilityTimer = Math.max(f.ultInvincibilityTimer || 0, 1.0);
+    const survived = AttackHandler.executeGanJiangMoYeDeathCounter(f, effectSystem);
+    f.ganjiangMoyeDeathCounterActive = false;
+    if (survived && f.hp > 1) return true;
+    f.hp = 0;
+    return false;
   }
 
   static tryDamageAvoidancePassives(f, effectSystem) {
