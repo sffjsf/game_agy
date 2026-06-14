@@ -229,15 +229,21 @@ export class FighterRenderer {
 
     // ── HP text centered on body ──
     ctx.save();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = "bold 16px 'Outfit', sans-serif";
+    const hpText = Math.ceil(f.hp).toString();
+    ctx.font = "900 22px 'Outfit', sans-serif";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-    ctx.shadowBlur = 4;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+    ctx.shadowBlur = 5;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
-    ctx.fillText(Math.ceil(f.hp), f.x, f.y);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+    ctx.lineWidth = 5;
+    ctx.strokeText(hpText, f.x, f.y);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(hpText, f.x, f.y);
     ctx.restore();
 
     // ── Charge glow ring (during charge state) ──
