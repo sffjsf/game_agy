@@ -29,6 +29,13 @@ export class AttackHandler {
         return;
       }
 
+      if (f.charData.id === 'two_faced_sukuna') {
+        f.sukunaLowHpBasicFollowup = f.hp < f.maxHp * 0.5;
+        AttackHandler.executeSukunaBasicSpin(f, effectSystem);
+        if (soundSystem) soundSystem.playSwingSound();
+        return;
+      }
+
       if (f.charData.id === 'celestial_sword_deity') {
         AttackHandler.flashToCelestialTargetFront(f, f.target, effectSystem);
 
@@ -470,6 +477,257 @@ export class AttackHandler {
         f.circleDir = Math.random() < 0.5 ? 1 : -1;
       }
     }
+  }
+
+  static executeSukunaBasicSpin(f, effectSystem) {
+    if (!f.battleContext || !f.battleContext.opposingTeam) return;
+
+    const radius = f.charData.attackRange || 195;
+    f.sukunaBasicSpin = {
+      radius,
+      hitCount: 10,
+      hitDamage: 3,
+      hitIndex: 0,
+      hitTimer: 0,
+      hitInterval: 0.095,
+      duration: 1.0,
+      elapsed: 0
+    };
+
+    EffectLib.addAoeMeleeEffect(effectSystem, f.x, f.y, '#FF1744', radius);
+    effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 24, '巨斧回天!', false, '#FF1744');
+    effectSystem.screenShake(5);
+  }
+
+  static updateSukunaBasicSpin(f, dt, effectSystem) {
+    const spin = f.sukunaBasicSpin;
+    if (!spin || !f.battleContext || !f.battleContext.opposingTeam) return false;
+
+    spin.elapsed += dt;
+    spin.hitTimer += dt;
+    f.angle += dt * 24;
+    f.ultInvincibilityTimer = Math.max(f.ultInvincibilityTimer || 0, 0.08);
+
+    if (f.target && f.target.isAlive()) {
+      const dx = f.target.x - f.x;
+      const dy = f.target.y - f.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      f.x += (dx / dist) * f.charData.speed * 72 * dt;
+      f.y += (dy / dist) * f.charData.speed * 72 * dt;
+    }
+
+    if (Math.random() < 0.75) {
+      const trailAngle = Math.random() * Math.PI * 2;
+      const trailRadius = Math.random() * spin.radius * 0.65;
+      effectSystem.addTrail(
+        f.x + Math.cos(trailAngle) * trailRadius,
+        f.y + Math.sin(trailAngle) * trailRadius,
+        '#FF174480',
+        7
+      );
+    }
+
+    while (spin.hitIndex < spin.hitCount && (spin.hitTimer >= spin.hitInterval || spin.elapsed >= spin.duration)) {
+      spin.hitTimer -= spin.hitInterval;
+      AttackHandler.resolveSukunaSpinHit(f, spin, effectSystem);
+      spin.hitIndex++;
+    }
+
+    if (spin.hitIndex >= spin.hitCount) {
+      f.sukunaBasicSpin = null;
+      if (f.sukunaLowHpBasicFollowup) {
+        f.sukunaLowHpBasicFollowup = false;
+        f.sukunaOverhealRequested = true;
+        if (!AttackHandler.tryStartSukunaOverhealHunt(f, effectSystem, true, true)) {
+          f.setState('cooldown');
+        }
+      } else {
+        f.setState('cooldown');
+      }
+    }
+
+    return true;
+  }
+
+  static resolveSukunaSpinHit(f, spin, effectSystem) {
+    const radius = spin.radius;
+    f.battleContext.opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive()) return;
+      const dx = enemy.x - f.x;
+      const dy = enemy.y - f.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= radius + enemy.charData.size) {
+        enemy.takeDamage(spin.hitDamage, f.x, f.y, effectSystem);
+        effectSystem.addHitEffect(enemy.x, enemy.y, '#FF1744');
+      }
+    });
+
+    effectSystem.addParticle({
+      x: f.x,
+      y: f.y,
+      vx: 0,
+      vy: 0,
+      life: 0.16,
+      maxLife: 0.16,
+      color: spin.hitIndex % 2 === 0 ? 'rgba(255, 23, 68, 0.75)' : 'rgba(43, 11, 11, 0.75)',
+      size: radius,
+      gravity: 0,
+      friction: 1,
+      type: 'ring'
+    });
+    effectSystem.screenShake(1.5);
+  }
+
+  static tryStartSukunaOverhealHunt(f, effectSystem, forceNow = false, ignoreCooldown = false) {
+    if (!f.hasPassive || !f.hasPassive('sukuna_overheal_hunt')) return false;
+    const requested = f.sukunaOverhealRequested || f.sukunaPendingOverhealHunt;
+    if (!requested) return false;
+
+    f.sukunaOverhealRequested = false;
+    if ((!ignoreCooldown && (f.sukunaOverhealCooldown || 0) > 0) || f.sukunaPassiveSlash) {
+      f.sukunaPendingOverhealHunt = false;
+      return false;
+    }
+
+    if (!forceNow && AttackHandler.isSukunaBusy(f)) {
+      f.sukunaPendingOverhealHunt = true;
+      return false;
+    }
+
+    const target = AttackHandler.findSukunaHighestHpEnemy(f);
+    if (!target) {
+      f.sukunaPendingOverhealHunt = false;
+      return false;
+    }
+
+    f.sukunaPendingOverhealHunt = false;
+    if (!ignoreCooldown) {
+      f.sukunaOverhealCooldown = 4.0;
+    }
+    f.sukunaPassiveSlash = {
+      target,
+      hitIndex: 0,
+      hitCount: 4,
+      hitDamage: f.charData.passiveSlashDamage || 9,
+      dashTimer: 0,
+      dashDuration: 0.11,
+      pauseTimer: 0,
+      pauseDuration: 0.05,
+      phase: 'dash',
+      startX: f.x,
+      startY: f.y,
+      endX: f.x,
+      endY: f.y
+    };
+
+    effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 24, '追猎四斩!', false, '#FF1744');
+    AttackHandler.prepareSukunaPassiveSlash(f, f.sukunaPassiveSlash, effectSystem);
+    return true;
+  }
+
+  static isSukunaBusy(f) {
+    return !!(
+      f.sukunaBasicSpin ||
+      f.sukunaPassiveSlash ||
+      f.state === 'attack' ||
+      f.state === 'skill' ||
+      f.state === 'channeling' ||
+      f.state === 'dashing_skill'
+    );
+  }
+
+  static findSukunaHighestHpEnemy(f) {
+    const opposingTeam = f.battleContext && f.battleContext.opposingTeam ? f.battleContext.opposingTeam : [];
+    let target = null;
+    let highestHp = -Infinity;
+    opposingTeam.forEach(enemy => {
+      if (!enemy.isAlive() || enemy.invisibleTimer > 0) return;
+      if (enemy.hp > highestHp) {
+        highestHp = enemy.hp;
+        target = enemy;
+      }
+    });
+    return target;
+  }
+
+  static updateSukunaPassiveSlash(f, dt, effectSystem) {
+    const slash = f.sukunaPassiveSlash;
+    if (!slash || !f.battleContext || !f.battleContext.opposingTeam) return false;
+
+    f.ultInvincibilityTimer = Math.max(f.ultInvincibilityTimer || 0, 0.18);
+
+    if (!slash.target || !slash.target.isAlive()) {
+      slash.target = AttackHandler.findSukunaHighestHpEnemy(f);
+      if (!slash.target) {
+        f.sukunaPassiveSlash = null;
+        f.setState('chase');
+        return false;
+      }
+    }
+
+    if (slash.phase === 'dash') {
+      slash.dashTimer += dt;
+      const pct = Math.min(1, slash.dashTimer / (slash.dashDuration || 0.11));
+      f.x = slash.startX + (slash.endX - slash.startX) * pct;
+      f.y = slash.startY + (slash.endY - slash.startY) * pct;
+      f.angle = Math.atan2(slash.target.y - f.y, slash.target.x - f.x);
+      effectSystem.addTrail(f.x, f.y, '#FF1744', 10);
+
+      if (pct >= 1) {
+        AttackHandler.resolveSukunaPassiveSlashHit(f, slash, effectSystem);
+        slash.hitIndex++;
+        slash.phase = 'pause';
+        slash.pauseTimer = 0;
+      }
+    } else {
+      slash.pauseTimer += dt;
+      if (slash.pauseTimer >= slash.pauseDuration) {
+        if (slash.hitIndex >= slash.hitCount) {
+          f.sukunaPassiveSlash = null;
+          f.setState('chase');
+        } else {
+          slash.target = AttackHandler.findSukunaHighestHpEnemy(f);
+          if (!slash.target) {
+            f.sukunaPassiveSlash = null;
+            f.setState('chase');
+          } else {
+            AttackHandler.prepareSukunaPassiveSlash(f, slash, effectSystem);
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
+  static prepareSukunaPassiveSlash(f, slash, effectSystem) {
+    const target = slash.target;
+    const offset = (target.charData.size || 30) + (f.charData.size || 38) + 12;
+    const angle = (slash.hitIndex / slash.hitCount) * Math.PI * 2 + (slash.hitIndex % 2 ? 0.45 : -0.45);
+    const endX = target.x + Math.cos(angle) * offset;
+    const endY = target.y + Math.sin(angle) * offset;
+    const ctx = f.battleContext;
+
+    slash.startX = f.x;
+    slash.startY = f.y;
+    slash.endX = ctx ? clamp(endX, ctx.arenaX + 30, ctx.arenaX + ctx.arenaWidth - 30) : endX;
+    slash.endY = ctx ? clamp(endY, ctx.arenaY + 30, ctx.arenaY + ctx.arenaHeight - 30) : endY;
+    slash.dashTimer = 0;
+    slash.phase = 'dash';
+    f.angle = Math.atan2(target.y - f.y, target.x - f.x);
+    EffectLib.addDashEffect(effectSystem, f.x, f.y, '#FF1744', 34);
+  }
+
+  static resolveSukunaPassiveSlashHit(f, slash, effectSystem) {
+    const target = slash.target;
+    if (!target || !target.isAlive()) return;
+
+    target.takeDamage(slash.hitDamage, f.x, f.y, effectSystem);
+    effectSystem.addHitEffect(target.x, target.y, '#FF1744');
+    effectSystem.addDamageNumber(target.x, target.y - target.charData.size - 12, `四斩 ${slash.hitIndex + 1}`, false, '#FFCDD2');
+    EffectLib.addBackstabEffect(effectSystem, target.x, target.y, '#FF1744', 26);
+    effectSystem.screenShake(3);
+    if (soundSystem) soundSystem.playCritSound();
   }
 
   /**

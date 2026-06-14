@@ -158,6 +158,14 @@ export class Fighter {
     this.isAscended = false;
     this.inSwordArray = false;
 
+    // Two-Faced Sukuna mechanics
+    this.sukunaBasicSpin = null;
+    this.sukunaOverhealCooldown = 0;
+    this.sukunaOverhealRequested = false;
+    this.sukunaPendingOverhealHunt = false;
+    this.sukunaPassiveSlash = null;
+    this.sukunaLowHpBasicFollowup = false;
+
     // Reference to enemy target (set externally)
     this.target = null;
     this.ai = new FighterAI(this);
@@ -194,10 +202,11 @@ export class Fighter {
   }
 
   // Debuff application — delegate to BuffManager
-  applyStun(duration)           { this.buffs.applyStun(duration); }
-  applySlow(duration)           { this.buffs.applySlow(duration); }
-  applyPoison(duration, dps)    { this.buffs.applyPoison(duration, dps); }
-  applyBurn(duration, dps)      { this.buffs.applyBurn(duration, dps); }
+  isDebuffImmune()              { return this.hasPassive && this.hasPassive('sukuna_debuff_immunity'); }
+  applyStun(duration)           { if (!this.isDebuffImmune()) this.buffs.applyStun(duration); }
+  applySlow(duration)           { if (!this.isDebuffImmune()) this.buffs.applySlow(duration); }
+  applyPoison(duration, dps)    { if (!this.isDebuffImmune()) this.buffs.applyPoison(duration, dps); }
+  applyBurn(duration, dps)      { if (!this.isDebuffImmune()) this.buffs.applyBurn(duration, dps); }
   isStunned()                   { return this.buffs.isStunned(); }
   isSlowed()                    { return this.buffs.isSlowed(); }
   isBurning()                   { return this.buffs.isBurning(); }
@@ -361,7 +370,43 @@ export class Fighter {
     this.bleedTimer = Math.max(0, (this.bleedTimer || 0) - dt);
     this.ultInvincibilityTimer = Math.max(0, (this.ultInvincibilityTimer || 0) - dt);
     this.frostLandTimer = Math.max(0, (this.frostLandTimer || 0) - dt);
+    this.sukunaOverhealCooldown = Math.max(0, (this.sukunaOverhealCooldown || 0) - dt);
+
+    if (this.isDebuffImmune()) {
+      this.buffs.clearAllNegativeEffects();
+      this.bleedTimer = 0;
+      this.bleedStacks = 0;
+      this.bleedTick = 0;
+      this.corrosionTimer = 0;
+      this.abyssalWeightStacks = 0;
+      this.abyssalWeightTimer = 0;
+      this.freezeTimer = 0;
+      this.temporalDilationTimer = 0;
+    }
+
     this.skillReady = (this.skillCooldown <= 0) && !this.buffs.isPoisoned();
+
+    AttackHandler.tryStartSukunaOverhealHunt(this, effectSystem);
+
+    if (AttackHandler.updateSukunaPassiveSlash(this, dt, effectSystem)) {
+      this.x = clamp(this.x, arenaX + 30, arenaX + arenaWidth - 30);
+      this.y = clamp(this.y, arenaY + 30, arenaY + arenaHeight - 30);
+      if (!isFinite(this.x)) this.x = arenaX + arenaWidth / 2;
+      if (!isFinite(this.y)) this.y = arenaY + arenaHeight / 2;
+      this.hp = safeFinite(this.hp, this.maxHp);
+      this.angle = normaliseAngle(this.angle);
+      return;
+    }
+
+    if (AttackHandler.updateSukunaBasicSpin(this, dt, effectSystem)) {
+      this.x = clamp(this.x, arenaX + 30, arenaX + arenaWidth - 30);
+      this.y = clamp(this.y, arenaY + 30, arenaY + arenaHeight - 30);
+      if (!isFinite(this.x)) this.x = arenaX + arenaWidth / 2;
+      if (!isFinite(this.y)) this.y = arenaY + arenaHeight / 2;
+      this.hp = safeFinite(this.hp, this.maxHp);
+      this.angle = normaliseAngle(this.angle);
+      return;
+    }
 
     if (AttackHandler.updateCelestialBasicSwordBarrage(this, dt, effectSystem)) {
       this.x = clamp(this.x, arenaX + 30, arenaX + arenaWidth - 30);

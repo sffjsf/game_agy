@@ -440,6 +440,68 @@ export class EffectSystem {
           ctx.lineWidth = 2 + (1 - progress) * 3;
           ctx.stroke();
           break;
+
+        case 'axe_slash':
+          // Heavy curved axe blade swinging outward in a sector.
+          var slashProgress = 1 - (p.life / p.maxLife);
+          var slashRange = p.range || p.size || 220;
+          var slashHalfAngle = p.halfAngle || 0.9;
+          var slashAngle = p.angle || 0;
+          var slashRadius = slashRange * (0.35 + slashProgress * 0.65);
+          var slashAlpha = Math.max(0, 1 - slashProgress * 0.55);
+
+          ctx.globalAlpha = alpha * slashAlpha;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(slashAngle);
+          ctx.shadowColor = p.glowColor || p.color;
+          ctx.shadowBlur = 18;
+
+          // Broad translucent sector showing the path of the axe sweep.
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.arc(0, 0, slashRadius, -slashHalfAngle, slashHalfAngle);
+          ctx.closePath();
+          ctx.fillStyle = p.fillColor || 'rgba(255, 23, 68, 0.18)';
+          ctx.fill();
+
+          // Bright outer blade arc.
+          ctx.beginPath();
+          ctx.arc(0, 0, slashRadius, -slashHalfAngle, slashHalfAngle);
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = (p.thickness || 18) * (1 - slashProgress * 0.45);
+          ctx.lineCap = 'round';
+          ctx.stroke();
+
+          // Inner hot edge.
+          ctx.beginPath();
+          ctx.arc(0, 0, slashRadius * 0.82, -slashHalfAngle * 0.82, slashHalfAngle * 0.82);
+          ctx.strokeStyle = p.edgeColor || '#FFCDD2';
+          ctx.lineWidth = (p.thickness || 18) * 0.32;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+
+          // Axe-head silhouettes at both ends of the swing, making the weapon readable.
+          for (var axeSide = -1; axeSide <= 1; axeSide += 2) {
+            ctx.save();
+            var axeAngle = axeSide * slashHalfAngle;
+            var axeX = Math.cos(axeAngle) * slashRadius;
+            var axeY = Math.sin(axeAngle) * slashRadius;
+            ctx.translate(axeX, axeY);
+            ctx.rotate(axeAngle + Math.PI / 2);
+            ctx.fillStyle = p.edgeColor || '#FFCDD2';
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, -(p.axeSize || 34));
+            ctx.quadraticCurveTo((p.axeSize || 34) * 0.75, 0, 0, (p.axeSize || 34));
+            ctx.lineTo(-(p.axeSize || 34) * 0.35, (p.axeSize || 34) * 0.28);
+            ctx.lineTo(-(p.axeSize || 34) * 0.35, -(p.axeSize || 34) * 0.28);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+          }
+          break;
       }
 
       ctx.restore();

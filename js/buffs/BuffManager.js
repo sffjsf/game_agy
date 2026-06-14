@@ -80,6 +80,17 @@ export class BuffManager {
     this.slow = 0;
   }
 
+  clearAllNegativeEffects() {
+    this.stun = 0;
+    this.slow = 0;
+    this.poison = 0;
+    this.poisonDps = 0;
+    this.poisonTick = 0;
+    this.burn = 0;
+    this.burnDps = 0;
+    this.burnTick = 0;
+  }
+
   // ═══════════════════════════════════════════════════════
   //  Per-frame tick
   // ═══════════════════════════════════════════════════════

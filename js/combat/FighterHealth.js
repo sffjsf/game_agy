@@ -15,6 +15,13 @@ export class FighterHealth {
     attackerX = safeFinite(attackerX, f.x);
     attackerY = safeFinite(attackerY, f.y);
 
+    if (f.hasPassive && f.hasPassive('sukuna_basic_spin') && f.sukunaBasicSpin && damage > 0) {
+      FighterHealth.heal(f, damage, effectSystem);
+      effectSystem.addDamageNumber(f.x, f.y - f.charData.size - 18, '伤转疗!', false, '#FF1744');
+      effectSystem.addHealEffect(f.x, f.y);
+      return;
+    }
+
     // Ult Invincibility, Chronoshift invulnerability, or Sword Deity survival dash check
     if (f.ultInvincibilityTimer > 0 || (f.chronoshiftInvulnTimer && f.chronoshiftInvulnTimer > 0) || (f.chronoshiftTimer && f.chronoshiftTimer > 0) || (f.invulnerableDashTimer && f.invulnerableDashTimer > 0)) {
       effectSystem.addDamageNumber(f.x, f.y - f.charData.size, '免伤!', false, '#E6C229');
@@ -168,6 +175,10 @@ export class FighterHealth {
   static heal(f, amount, effectSystem) {
     if (!f.alive) return;
     amount = safeFinite(amount, 0);
+    const wasFull = f.hp >= f.maxHp;
+    if (amount > 0 && wasFull && f.hasPassive && f.hasPassive('sukuna_overheal_hunt') && (f.sukunaOverhealCooldown || 0) <= 0) {
+      f.sukunaOverhealRequested = true;
+    }
     f.hp = clamp(f.hp + amount, 0, f.maxHp);
     effectSystem.addHealEffect(f.x, f.y);
   }

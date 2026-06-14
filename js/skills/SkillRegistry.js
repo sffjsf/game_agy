@@ -32,6 +32,7 @@ import { executeAbyssalTorrent } from './abilities/AbyssalTorrent.js';
 import { executeTemporalField } from './abilities/TemporalField.js';
 import { executeCelestialSwords } from './abilities/CelestialSwords.js';
 import { executeFrostLand } from './abilities/FrostLand.js';
+import { executeSukunaTwinAxes } from './abilities/SukunaTwinAxes.js';
 import { safeFinite } from '../utils.js';
 
 /**
@@ -76,6 +77,7 @@ const skillExecutors = {
   temporal_field:     executeTemporalField,
   celestial_swords:   executeCelestialSwords,
   frost_land:         executeFrostLand,
+  sukuna_twin_axes:   executeSukunaTwinAxes,
 };
 
 /**
