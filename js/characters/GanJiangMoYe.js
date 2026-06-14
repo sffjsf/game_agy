@@ -11,7 +11,7 @@ export const gan_jiang_mo_ye = {
     size: 36,
     speed: 4.6,
     hp: 175,
-    attackPower: 5,
+    attackPower: 8,
     attackSpeed: 1.15,
     chargeTime: 0.2,
     attackRange: 9999,
@@ -24,7 +24,7 @@ export const gan_jiang_mo_ye = {
     projectileType: null,
 
     passives: [
-        { id: 'ganjiang_moye_basic', name: '双剑交汇', description: '普通攻击无距离限制，从身体左右两侧各发射一柄巨剑：红色「干将」与蓝色「莫邪」偏转35度弧线飞出，追踪并穿刺最近敌人。命中施加交汇剑痕；同一目标被同批双剑命中会眩晕；普攻造成的实际伤害100%转化为治疗。' },
+        { id: 'ganjiang_moye_basic', name: '双剑交汇', description: '普通攻击无距离限制，从身体左右两侧各发射一柄巨剑：红色「干将」与蓝色「莫邪」偏转35度弧线飞出，追踪并穿刺最近敌人。命中施加交汇剑痕；同一目标被同批双剑命中会眩晕；普攻造成的实际伤害40%转化为治疗。' },
         { id: 'ganjiang_moye_random_pierce', name: '剑遁穿身', description: '受到非灼烧伤害时有25%概率使本次受击无效，并穿刺飞到战场任意位置；沿途敌人获得交汇剑痕，穿刺期间无敌。' },
         { id: 'ganjiang_moye_death_counter', name: '双剑续命', description: '血量归0时不会立即死亡，而是无敌并立即发动一次普攻；若因此恢复生命则免死（冷却4秒）。' }
     ],

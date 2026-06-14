@@ -495,7 +495,7 @@ export class AttackHandler {
     f.target = target;
     f.angle = Math.atan2(target.y - f.y, target.x - f.x);
     const batchId = options.batchId || `gm_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-    const damage = options.damage || f.charData.attackPower || 5;
+    const damage = options.damage || f.charData.attackPower || 8;
 
     AttackHandler.spawnGanJiangMoYeSword(f, weaponSystem, target, {
       swordName: 'ganjiang',
@@ -584,7 +584,7 @@ export class AttackHandler {
     if (!target) return false;
 
     const batchId = `gm_death_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-    const damage = f.charData.attackPower || 5;
+    const damage = f.charData.attackPower || 8;
     let healed = 0;
     ['ganjiang', 'moye'].forEach((swordName, index) => {
       if (!target.isAlive()) return;
@@ -592,8 +592,8 @@ export class AttackHandler {
       target.takeDamage(damage, f.x, f.y, effectSystem, { attacker: f, sourceTeam: f.team, source: 'death_counter' });
       const dealt = Math.max(0, beforeHp - target.hp);
       if (dealt > 0) {
-        f.heal(dealt, effectSystem);
-        healed += dealt;
+        f.heal(dealt * 0.4, effectSystem);
+        healed += dealt * 0.4;
       }
       if (target.applyConvergenceSwordMark) target.applyConvergenceSwordMark(f, effectSystem);
       target.ganjiangMoyeSwordHitsByBatch = target.ganjiangMoyeSwordHitsByBatch || {};

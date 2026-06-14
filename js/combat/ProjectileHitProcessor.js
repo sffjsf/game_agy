@@ -50,7 +50,7 @@ export class ProjectileHitProcessor {
         hit.target.ganjiangMoyeSwordHitsByBatch[batchId] = record;
 
         if ((hit.actualDamage || 0) > 0) {
-          attacker.heal(hit.actualDamage, this.effectSystem);
+          attacker.heal(hit.actualDamage * 0.4, this.effectSystem);
         }
         return;
       }
